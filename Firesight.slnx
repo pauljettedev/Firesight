@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Firesight.Api/Firesight.Api.csproj" />
+    <Project Path="src/Firesight.Application/Firesight.Application.csproj" />
+    <Project Path="src/Firesight.Domain/Firesight.Domain.csproj" />
+    <Project Path="src/Firesight.Infrastructure/Firesight.Infrastructure.csproj" />
+    <Project Path="src/Firesight.Mcp/Firesight.Mcp.csproj" />
+  </Folder>
+  <Folder Name="/src/Firesight.Web/">
+    <File Path="src/Firesight.Web/package.json" />
+    <File Path="src/Firesight.Web/package-lock.json" />
+    <File Path="src/Firesight.Web/vite.config.ts" />
+    <File Path="src/Firesight.Web/eslint.config.js" />
+    <File Path="src/Firesight.Web/tsconfig.json" />
+    <File Path="src/Firesight.Web/tsconfig.app.json" />
+    <File Path="src/Firesight.Web/tsconfig.node.json" />
+    <File Path="src/Firesight.Web/index.html" />
+    <File Path="src/Firesight.Web/README.md" />
+    <File Path="src/Firesight.Web/.gitignore" />
+    <File Path="src/Firesight.Web/public/favicon.svg" />
+    <File Path="src/Firesight.Web/public/icons.svg" />
+    <File Path="src/Firesight.Web/src/main.tsx" />
+    <File Path="src/Firesight.Web/src/App.tsx" />
+    <File Path="src/Firesight.Web/src/components/WildfireMap.tsx" />
+    <File Path="src/Firesight.Web/src/services/healthService.ts" />
+    <File Path="src/Firesight.Web/src/services/wildfireService.ts" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Firesight.IntegrationTests/Firesight.IntegrationTests.csproj" />
+    <Project Path="tests/Firesight.UnitTests/Firesight.UnitTests.csproj" />
+  </Folder>
+</Solution>

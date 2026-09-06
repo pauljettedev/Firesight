@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgis/postgis:latest
+    container_name: firesight-postgres
+    environment:
+      POSTGRES_DB: firesight
+      POSTGRES_USER: firesight
+      POSTGRES_PASSWORD: firesight
+    ports:
+      - "5432:5432"
+    volumes:
+      - firesight-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  firesight-postgres-data:
