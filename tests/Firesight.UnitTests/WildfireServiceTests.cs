@@ -107,6 +107,35 @@ public sealed class WildfireServiceTests
     }
 
     [Fact]
+    public async Task GetWildfireByExternalIdAsync_ReturnsRepositoryData()
+    {
+        var expected = new WildfireDto(
+            Guid.NewGuid(),
+            "2026_ON_THU_FIRE_036",
+            "ON",
+            null,
+            50.6828,
+            -89.468,
+            null,
+            301240,
+            "BH",
+            new DateTime(2026, 9, 4, 16, 0, 0, DateTimeKind.Utc),
+            DateTime.UtcNow,
+            false);
+
+        var repository = new StubRepository((0, 0, 0), wildfireById: expected);
+        var service = new WildfireService(
+            new StubSource(new WildfireSourceResult([], 0, 0, 0)),
+            repository,
+            new StubSyncStateRepository());
+
+        var result = await service.GetWildfireByExternalIdAsync(expected.ExternalId);
+
+        Assert.Same(expected, result);
+        Assert.Equal(expected.ExternalId, repository.RequestedExternalId);
+    }
+
+    [Fact]
     public async Task RefreshAsync_SerializesConcurrentRefreshesAcrossServiceInstances()
     {
         var firstSource = new BlockingSource();
@@ -183,13 +212,23 @@ public sealed class WildfireServiceTests
 
     private sealed class StubRepository(
         (int Inserted, int Changed, int Observed) syncResult,
-        IReadOnlyList<WildfireDto>? wildfires = null) : IWildfireRepository
+        IReadOnlyList<WildfireDto>? wildfires = null,
+        WildfireDto? wildfireById = null) : IWildfireRepository
     {
         public IReadOnlyCollection<WildfireImportRecord>? SynchronizedRecords { get; private set; }
+        public string? RequestedExternalId { get; private set; }
 
         public Task<IReadOnlyList<WildfireDto>> GetAllAsync(
             CancellationToken cancellationToken = default) =>
             Task.FromResult(wildfires ?? []);
+
+        public Task<WildfireDto?> GetByExternalIdAsync(
+            string externalId,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedExternalId = externalId;
+            return Task.FromResult(wildfireById);
+        }
 
         public Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
             IReadOnlyCollection<WildfireImportRecord> records,
@@ -205,6 +244,11 @@ public sealed class WildfireServiceTests
         public Task<IReadOnlyList<WildfireDto>> GetAllAsync(
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<WildfireDto>>([]);
+
+        public Task<WildfireDto?> GetByExternalIdAsync(
+            string externalId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<WildfireDto?>(null);
 
         public Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
             IReadOnlyCollection<WildfireImportRecord> records,

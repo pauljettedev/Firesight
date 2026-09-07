@@ -11,6 +11,11 @@ public sealed class WildfireService(
         CancellationToken cancellationToken = default) =>
         repository.GetAllAsync(cancellationToken);
 
+    public Task<WildfireDto?> GetWildfireByExternalIdAsync(
+        string externalId,
+        CancellationToken cancellationToken = default) =>
+        repository.GetByExternalIdAsync(externalId, cancellationToken);
+
     public Task<WildfireFeedSyncStateDto?> GetFeedSyncStateAsync(
         CancellationToken cancellationToken = default) =>
         syncStateRepository.GetAsync(cancellationToken);

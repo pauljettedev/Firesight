@@ -25,6 +25,18 @@ builder.Services.AddMcpServer()
                 OpenWorld = false,
                 UseStructuredContent = true,
                 OutputSchema = WildfireResultSchema.ActiveWildfires
+            }),
+        McpServerTool.Create(
+            typeof(WildfireTools).GetMethod(nameof(WildfireTools.GetWildfireByExternalIdAsync))!,
+            options: new McpServerToolCreateOptions
+            {
+                Name = "get_wildfire_by_external_id",
+                Description = "Returns a wildfire by its CWFIS national fire identifier, or null when no current record is available.",
+                ReadOnly = true,
+                Idempotent = true,
+                OpenWorld = false,
+                UseStructuredContent = true,
+                OutputSchema = WildfireResultSchema.WildfireById
             })
     ]);
 

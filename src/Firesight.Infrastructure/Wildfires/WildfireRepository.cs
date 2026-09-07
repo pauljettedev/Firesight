@@ -32,20 +32,30 @@ public sealed class WildfireRepository(
             .ToListAsync(cancellationToken);
 
         return wildfires
-            .Select(fire => new WildfireDto(
-                fire.Id,
-                fire.ExternalId,
-                fire.Agency,
-                fire.Name,
-                fire.Location.Y,
-                fire.Location.X,
-                fire.StartDate,
-                fire.AreaHectares,
-                fire.Status,
-                fire.StatusDateUtc,
-                fire.LastSeenInFeedUtc,
-                fire.LastSeenInFeedUtc < staleCutoffUtc))
+            .Select(fire => ToDto(fire, staleCutoffUtc))
             .ToList();
+    }
+
+    public async Task<WildfireDto?> GetByExternalIdAsync(
+        string externalId,
+        CancellationToken cancellationToken = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var extinguishedCutoffUtc = nowUtc.AddDays(-_retentionOptions.ExtinguishedDays);
+        var staleCutoffUtc = nowUtc.AddHours(-_freshnessOptions.StaleAfterHours);
+
+        var wildfire = await dbContext.Wildfires
+            .AsNoTracking()
+            .Where(fire =>
+                fire.ExternalId == externalId &&
+                (fire.Status != "EX" ||
+                 fire.FirstObservedExtinguishedUtc == null ||
+                 fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return wildfire is null
+            ? null
+            : ToDto(wildfire, staleCutoffUtc);
     }
 
     public async Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
@@ -100,6 +110,21 @@ public sealed class WildfireRepository(
         await dbContext.SaveChangesAsync(cancellationToken);
         return (inserted, changed, observed);
     }
+
+    private static WildfireDto ToDto(Wildfire fire, DateTime staleCutoffUtc) =>
+        new(
+            fire.Id,
+            fire.ExternalId,
+            fire.Agency,
+            fire.Name,
+            fire.Location.Y,
+            fire.Location.X,
+            fire.StartDate,
+            fire.AreaHectares,
+            fire.Status,
+            fire.StatusDateUtc,
+            fire.LastSeenInFeedUtc,
+            fire.LastSeenInFeedUtc < staleCutoffUtc);
 
     private static bool HasSourceChanges(
         Wildfire wildfire,
