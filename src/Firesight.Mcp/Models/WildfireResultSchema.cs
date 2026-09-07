@@ -66,13 +66,9 @@ public static class WildfireResultSchema
               "id",
               "externalId",
               "agency",
-              "name",
               "latitude",
               "longitude",
-              "startDate",
-              "areaHectares",
               "status",
-              "statusDateUtc",
               "lastSeenInFeedUtc",
               "isStale"
             ],
