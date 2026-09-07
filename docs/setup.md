@@ -67,13 +67,16 @@ Current development URL:
 http://localhost:5213
 ```
 
-The first startup attempts to import current active fires from CWFIS. An upstream CWFIS failure is logged but does not prevent the API from starting.
+The first startup attempts to import current active fires from CWFIS. An upstream CWFIS failure is logged but does not prevent the API from starting. The API then refreshes the feed hourly while it is running.
+
+Per-fire staleness is controlled by `WildfireFreshness:StaleAfterHours`; the current default is 48 hours.
 
 Useful endpoints:
 
 ```text
 http://localhost:5213/api/health
 http://localhost:5213/api/wildfires
+http://localhost:5213/api/wildfires/sync-state
 ```
 
 Force an immediate CWFIS refresh:

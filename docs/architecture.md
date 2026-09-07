@@ -54,6 +54,8 @@ Examples:
 - find fires near a location
 - get fire details
 - refresh wildfire data
+- expose feed synchronization state
+- calculate per-fire freshness/staleness
 - calculate application-level summaries
 
 Both REST endpoints and MCP tools should reuse this layer.
