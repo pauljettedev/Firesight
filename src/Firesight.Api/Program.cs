@@ -2,6 +2,7 @@ using Firesight.Api.Endpoints;
 using Firesight.Application;
 using Firesight.Infrastructure;
 using Firesight.Infrastructure.Persistence;
+using Firesight.Mcp.Models;
 using Firesight.Mcp.Tools;
 using ModelContextProtocol.Server;
 
@@ -12,7 +13,20 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMcpServer()
     .WithHttpTransport(options => options.Stateless = true)
-    .WithTools<WildfireTools>();
+    .WithTools([
+        McpServerTool.Create(
+            typeof(WildfireTools).GetMethod(nameof(WildfireTools.GetActiveWildfiresAsync))!,
+            options: new McpServerToolCreateOptions
+            {
+                Name = "get_active_wildfires",
+                Description = "Returns the current wildfire records available in Firesight.",
+                ReadOnly = true,
+                Idempotent = true,
+                OpenWorld = false,
+                UseStructuredContent = true,
+                OutputSchema = WildfireResultSchema.ActiveWildfires
+            })
+    ]);
 
 var app = builder.Build();
 

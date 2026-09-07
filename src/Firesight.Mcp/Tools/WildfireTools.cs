@@ -1,21 +1,20 @@
-using System.ComponentModel;
 using Firesight.Application.Wildfires;
-using ModelContextProtocol.Server;
+using Firesight.Mcp.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Firesight.Mcp.Tools;
 
-[McpServerToolType]
 public class WildfireTools
 {
-    [McpServerTool(
-        Name = "get_active_wildfires",
-        ReadOnly = true,
-        Idempotent = true,
-        OpenWorld = false,
-        UseStructuredContent = true)]
-    [Description("Returns the current wildfire records available in Firesight.")]
-    public static Task<IReadOnlyList<WildfireDto>> GetActiveWildfiresAsync(
-        IWildfireService wildfireService,
-        CancellationToken cancellationToken) =>
-        wildfireService.GetActiveWildfiresAsync(cancellationToken);
+    public static async Task<IReadOnlyList<WildfireResult>> GetActiveWildfiresAsync(
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        var wildfireService = services.GetRequiredService<IWildfireService>();
+        var wildfires = await wildfireService.GetActiveWildfiresAsync(cancellationToken);
+
+        return wildfires
+            .Select(WildfireResult.FromApplication)
+            .ToList();
+    }
 }
