@@ -9,6 +9,12 @@ public interface IWildfireService
         string externalId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<NearbyWildfireDto>> FindWildfiresNearAsync(
+        double latitude,
+        double longitude,
+        double radiusKm,
+        CancellationToken cancellationToken = default);
+
     Task<WildfireFeedSyncStateDto?> GetFeedSyncStateAsync(
         CancellationToken cancellationToken = default);
 

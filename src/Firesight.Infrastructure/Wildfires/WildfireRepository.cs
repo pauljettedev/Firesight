@@ -12,6 +12,8 @@ public sealed class WildfireRepository(
     IOptions<WildfireRetentionOptions> retentionOptions,
     IOptions<WildfireFreshnessOptions> freshnessOptions) : IWildfireRepository
 {
+    private const int Wgs84Srid = 4326;
+
     private readonly WildfireRetentionOptions _retentionOptions = retentionOptions.Value;
     private readonly WildfireFreshnessOptions _freshnessOptions = freshnessOptions.Value;
 
@@ -56,6 +58,49 @@ public sealed class WildfireRepository(
         return wildfire is null
             ? null
             : ToDto(wildfire, staleCutoffUtc);
+    }
+
+    public async Task<IReadOnlyList<NearbyWildfireDto>> FindNearAsync(
+        double latitude,
+        double longitude,
+        double radiusKm,
+        CancellationToken cancellationToken = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var extinguishedCutoffUtc = nowUtc.AddDays(-_retentionOptions.ExtinguishedDays);
+        var staleCutoffUtc = nowUtc.AddHours(-_freshnessOptions.StaleAfterHours);
+        // Search origin in WGS 84 longitude/latitude coordinates.
+        var origin = new Point(longitude, latitude) { SRID = Wgs84Srid };
+
+        // PostGIS geography distances are measured in metres.
+        var radiusMeters = radiusKm * 1000d;
+
+        var matches = await dbContext.Wildfires
+            .AsNoTracking()
+            .Where(fire =>
+                (fire.Status != "EX" ||
+                 fire.FirstObservedExtinguishedUtc == null ||
+                 fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc) &&
+
+                // Use PostGIS spatial filtering for the search radius.
+                fire.Location.IsWithinDistance(origin, radiusMeters))
+            .OrderBy(fire =>
+                // Sort nearest fire first.
+                fire.Location.Distance(origin))
+            .Select(fire => new
+            {
+                Wildfire = fire,
+
+                // Keep the actual distance so it can be returned to the caller.
+                DistanceMeters = fire.Location.Distance(origin)
+            })
+            .ToListAsync(cancellationToken);
+
+        return matches
+            .Select(match => new NearbyWildfireDto(
+                ToDto(match.Wildfire, staleCutoffUtc),
+                match.DistanceMeters / 1000d))
+            .ToList();
     }
 
     public async Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
@@ -149,7 +194,7 @@ public sealed class WildfireRepository(
     {
         wildfire.Agency = incoming.Agency;
         wildfire.Name = incoming.Name;
-        wildfire.Location = new Point(incoming.Longitude, incoming.Latitude) { SRID = 4326 };
+        wildfire.Location = new Point(incoming.Longitude, incoming.Latitude) { SRID = Wgs84Srid };
         wildfire.StartDate = incoming.StartDate;
         wildfire.AreaHectares = incoming.AreaHectares;
 

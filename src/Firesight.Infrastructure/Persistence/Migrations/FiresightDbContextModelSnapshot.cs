@@ -73,6 +73,9 @@ namespace Firesight.Infrastructure.Persistence.Migrations
                     b.HasIndex("ExternalId")
                         .IsUnique();
 
+                    b.HasIndex("Location")
+                        .HasMethod("gist");
+
                     b.ToTable("Wildfires", (string)null);
                 });
 

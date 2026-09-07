@@ -136,6 +136,51 @@ public sealed class WildfireServiceTests
     }
 
     [Fact]
+    public async Task FindWildfiresNearAsync_ForwardsValidatedQueryToRepository()
+    {
+        IReadOnlyList<NearbyWildfireDto> expected = [];
+        var repository = new StubRepository((0, 0, 0), nearbyWildfires: expected);
+        var service = new WildfireService(
+            new StubSource(new WildfireSourceResult([], 0, 0, 0)),
+            repository,
+            new StubSyncStateRepository());
+
+        var result = await service.FindWildfiresNearAsync(45.4215, -75.6972, 100);
+
+        Assert.Same(expected, result);
+        Assert.Equal(45.4215, repository.RequestedLatitude);
+        Assert.Equal(-75.6972, repository.RequestedLongitude);
+        Assert.Equal(100, repository.RequestedRadiusKm);
+    }
+
+    [Theory]
+    [InlineData(-91, 0, 10)]
+    [InlineData(91, 0, 10)]
+    [InlineData(0, -181, 10)]
+    [InlineData(0, 181, 10)]
+    [InlineData(0, 0, 0)]
+    [InlineData(0, 0, -1)]
+    [InlineData(double.NaN, 0, 10)]
+    [InlineData(double.PositiveInfinity, 0, 10)]
+    [InlineData(0, double.NaN, 10)]
+    [InlineData(0, double.NegativeInfinity, 10)]
+    [InlineData(0, 0, double.NaN)]
+    [InlineData(0, 0, double.PositiveInfinity)]
+    public async Task FindWildfiresNearAsync_InvalidQuery_Throws(
+        double latitude,
+        double longitude,
+        double radiusKm)
+    {
+        var service = new WildfireService(
+            new StubSource(new WildfireSourceResult([], 0, 0, 0)),
+            new StubRepository((0, 0, 0)),
+            new StubSyncStateRepository());
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.FindWildfiresNearAsync(latitude, longitude, radiusKm));
+    }
+
+    [Fact]
     public async Task RefreshAsync_SerializesConcurrentRefreshesAcrossServiceInstances()
     {
         var firstSource = new BlockingSource();
@@ -213,10 +258,14 @@ public sealed class WildfireServiceTests
     private sealed class StubRepository(
         (int Inserted, int Changed, int Observed) syncResult,
         IReadOnlyList<WildfireDto>? wildfires = null,
-        WildfireDto? wildfireById = null) : IWildfireRepository
+        WildfireDto? wildfireById = null,
+        IReadOnlyList<NearbyWildfireDto>? nearbyWildfires = null) : IWildfireRepository
     {
         public IReadOnlyCollection<WildfireImportRecord>? SynchronizedRecords { get; private set; }
         public string? RequestedExternalId { get; private set; }
+        public double? RequestedLatitude { get; private set; }
+        public double? RequestedLongitude { get; private set; }
+        public double? RequestedRadiusKm { get; private set; }
 
         public Task<IReadOnlyList<WildfireDto>> GetAllAsync(
             CancellationToken cancellationToken = default) =>
@@ -228,6 +277,18 @@ public sealed class WildfireServiceTests
         {
             RequestedExternalId = externalId;
             return Task.FromResult(wildfireById);
+        }
+
+        public Task<IReadOnlyList<NearbyWildfireDto>> FindNearAsync(
+            double latitude,
+            double longitude,
+            double radiusKm,
+            CancellationToken cancellationToken = default)
+        {
+            RequestedLatitude = latitude;
+            RequestedLongitude = longitude;
+            RequestedRadiusKm = radiusKm;
+            return Task.FromResult(nearbyWildfires ?? []);
         }
 
         public Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
@@ -249,6 +310,13 @@ public sealed class WildfireServiceTests
             string externalId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<WildfireDto?>(null);
+
+        public Task<IReadOnlyList<NearbyWildfireDto>> FindNearAsync(
+            double latitude,
+            double longitude,
+            double radiusKm,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<NearbyWildfireDto>>([]);
 
         public Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
             IReadOnlyCollection<WildfireImportRecord> records,

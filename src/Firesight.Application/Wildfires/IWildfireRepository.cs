@@ -9,6 +9,12 @@ public interface IWildfireRepository
         string externalId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<NearbyWildfireDto>> FindNearAsync(
+        double latitude,
+        double longitude,
+        double radiusKm,
+        CancellationToken cancellationToken = default);
+
     Task<(int Inserted, int Changed, int Observed)> SynchronizeAsync(
         IReadOnlyCollection<WildfireImportRecord> wildfires,
         CancellationToken cancellationToken = default);

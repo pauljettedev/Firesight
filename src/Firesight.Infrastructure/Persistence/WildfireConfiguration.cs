@@ -30,6 +30,9 @@ public class WildfireConfiguration : IEntityTypeConfiguration<Wildfire>
             .IsRequired()
             .HasColumnType("geography (point)");
 
+        builder.HasIndex(fire => fire.Location)
+            .HasMethod("gist");
+
         builder.Property(fire => fire.Status)
             .IsRequired()
             .HasMaxLength(50);

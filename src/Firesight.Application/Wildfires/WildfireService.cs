@@ -16,6 +16,40 @@ public sealed class WildfireService(
         CancellationToken cancellationToken = default) =>
         repository.GetByExternalIdAsync(externalId, cancellationToken);
 
+    public Task<IReadOnlyList<NearbyWildfireDto>> FindWildfiresNearAsync(
+        double latitude,
+        double longitude,
+        double radiusKm,
+        CancellationToken cancellationToken = default)
+    {
+        if (!double.IsFinite(latitude))
+        {
+            throw new ArgumentOutOfRangeException(nameof(latitude));
+        }
+
+        if (!double.IsFinite(longitude))
+        {
+            throw new ArgumentOutOfRangeException(nameof(longitude));
+        }
+
+        if (!double.IsFinite(radiusKm))
+        {
+            throw new ArgumentOutOfRangeException(nameof(radiusKm));
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(latitude, -90);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(latitude, 90);
+        ArgumentOutOfRangeException.ThrowIfLessThan(longitude, -180);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(longitude, 180);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(radiusKm, 0);
+
+        return repository.FindNearAsync(
+            latitude,
+            longitude,
+            radiusKm,
+            cancellationToken);
+    }
+
     public Task<WildfireFeedSyncStateDto?> GetFeedSyncStateAsync(
         CancellationToken cancellationToken = default) =>
         syncStateRepository.GetAsync(cancellationToken);
