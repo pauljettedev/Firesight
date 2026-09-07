@@ -5,7 +5,7 @@ using ModelContextProtocol.Server;
 namespace Firesight.Mcp.Tools;
 
 [McpServerToolType]
-public static class WildfireTools
+public class WildfireTools
 {
     [McpServerTool(
         Name = "get_active_wildfires",
