@@ -18,6 +18,35 @@ public static class WildfireEndpoints
             return Results.Ok(wildfires);
         });
 
+        group.MapGet("/near", async (
+            double latitude,
+            double longitude,
+            double radiusKm,
+            IWildfireService service,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var wildfires = await service.FindWildfiresNearAsync(
+                    latitude,
+                    longitude,
+                    radiusKm,
+                    cancellationToken);
+
+                return Results.Ok(wildfires);
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        [exception.ParamName ?? "query"] =
+                            [GetValidationMessage(exception.ParamName)]
+                    },
+                    title: "Invalid wildfire search parameters");
+            }
+        });
+
         group.MapGet("/sync-state", async (
             IWildfireService service,
             CancellationToken cancellationToken) =>
@@ -36,4 +65,13 @@ public static class WildfireEndpoints
 
         return endpoints;
     }
+
+    private static string GetValidationMessage(string? parameterName) =>
+        parameterName switch
+        {
+            "latitude" => "Latitude must be a finite value between -90 and 90.",
+            "longitude" => "Longitude must be a finite value between -180 and 180.",
+            "radiusKm" => "Radius must be a finite value greater than 0.",
+            _ => "One or more query parameters are invalid."
+        };
 }

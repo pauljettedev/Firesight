@@ -32,6 +32,27 @@ Relevant freshness fields include:
 
 `isStale` describes Firesight's observation freshness only. It does not alter the raw CWFIS stage-of-control status.
 
+## Wildfires within a radius
+
+```http
+GET /api/wildfires/near?latitude=45.4215&longitude=-75.6972&radiusKm=25
+```
+
+Returns wildfire records whose PostGIS geography point falls within the requested radius, ordered nearest first.
+
+Each result contains:
+
+- `wildfire` - the normal wildfire DTO
+- `distanceKm` - distance from the supplied point in kilometres
+
+Query constraints:
+
+- `latitude`: finite value from `-90` to `90`
+- `longitude`: finite value from `-180` to `180`
+- `radiusKm`: finite value greater than `0`
+
+Invalid values return `400 Bad Request` using a validation-problem response with a stable parameter-specific error message. The spatial query uses the indexed PostGIS geography column rather than loading records and calculating distances in application memory.
+
 ## Refresh CWFIS data
 
 ```http
@@ -60,3 +81,7 @@ Returns dataset-level CWFIS fetch metadata, including:
 - rejected feature count
 
 These values describe the dataset fetch. They do not imply that every stored wildfire was present or individually refreshed during that fetch.
+
+## API error handling status
+
+Radius-search validation currently maps application-level argument validation to an HTTP validation-problem response at the endpoint. A centralized API exception-handling and Problem Details policy is still planned before the HTTP surface grows significantly.
