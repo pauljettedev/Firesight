@@ -11,14 +11,6 @@ public sealed class CwfisWildfireSource(
     IOptions<CwfisOptions> options,
     ILogger<CwfisWildfireSource> logger) : IWildfireSource
 {
-    private static readonly string[] AgencyFields = ["agency_code"];
-    private static readonly string[] ExternalIdFields = ["national_fire_id"];
-    private static readonly string[] LatitudeFields = ["latitude"];
-    private static readonly string[] LongitudeFields = ["longitude"];
-    private static readonly string[] AreaFields = ["fire_size"];
-    private static readonly string[] StatusFields = ["stage_of_control_status"];
-    private static readonly string[] StatusDateFields = ["status_date"];
-
     private readonly CwfisOptions _options = options.Value;
 
     public async Task<WildfireSourceResult> GetActiveWildfiresAsync(
@@ -152,17 +144,17 @@ public sealed class CwfisWildfireSource(
             return null;
         }
 
-        var externalId = GetString(properties, ExternalIdFields);
+        var externalId = GetString(properties, "national_fire_id");
         if (string.IsNullOrWhiteSpace(externalId))
         {
             rejectionReason = "missing national_fire_id";
             return null;
         }
 
-        var agency = GetString(properties, AgencyFields) ?? "Unknown";
-        var area = GetDouble(properties, AreaFields);
-        var status = GetString(properties, StatusFields) ?? string.Empty;
-        var statusDateUtc = GetDateTime(properties, StatusDateFields);
+        var agency = GetString(properties, "agency_code") ?? "Unknown";
+        var area = GetDouble(properties, "fire_size");
+        var status = GetString(properties, "stage_of_control_status") ?? string.Empty;
+        var statusDateUtc = GetDateTime(properties, "status_date");
 
         return new WildfireImportRecord(
             externalId,
@@ -213,8 +205,8 @@ public sealed class CwfisWildfireSource(
             return IsValidCoordinate(longitude, latitude);
         }
 
-        var propertyLatitude = GetDouble(properties, LatitudeFields);
-        var propertyLongitude = GetDouble(properties, LongitudeFields);
+        var propertyLatitude = GetDouble(properties, "latitude");
+        var propertyLongitude = GetDouble(properties, "longitude");
         if (propertyLatitude is null || propertyLongitude is null)
         {
             return false;
@@ -228,66 +220,48 @@ public sealed class CwfisWildfireSource(
     private static bool IsValidCoordinate(double longitude, double latitude) =>
         longitude is >= -180 and <= 180 && latitude is >= -90 and <= 90;
 
-    private static string? GetString(JsonElement properties, IEnumerable<string> names)
+    private static string? GetString(JsonElement properties, string name)
     {
-        foreach (var name in names)
+        if (!TryGetPropertyIgnoreCase(properties, name, out var value))
         {
-            if (!TryGetPropertyIgnoreCase(properties, name, out var value))
-            {
-                continue;
-            }
-
-            var result = value.ValueKind switch
-            {
-                JsonValueKind.String => value.GetString(),
-                JsonValueKind.Number => value.GetRawText(),
-                _ => null
-            };
-
-            if (!string.IsNullOrWhiteSpace(result))
-            {
-                return result.Trim();
-            }
+            return null;
         }
 
-        return null;
+        var result = value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => value.GetRawText(),
+            _ => null
+        };
+
+        return string.IsNullOrWhiteSpace(result)
+            ? null
+            : result.Trim();
     }
 
-    private static double? GetDouble(JsonElement properties, IEnumerable<string> names)
+    private static double? GetDouble(JsonElement properties, string name)
     {
-        foreach (var name in names)
-        {
-            if (TryGetPropertyIgnoreCase(properties, name, out var value) &&
-                TryGetDouble(value, out var parsed))
-            {
-                return parsed;
-            }
-        }
-
-        return null;
+        return TryGetPropertyIgnoreCase(properties, name, out var value) &&
+               TryGetDouble(value, out var parsed)
+            ? parsed
+            : null;
     }
 
-    private static DateTime? GetDateTime(JsonElement properties, IEnumerable<string> names)
+    private static DateTime? GetDateTime(JsonElement properties, string name)
     {
-        foreach (var name in names)
+        if (!TryGetPropertyIgnoreCase(properties, name, out var value) ||
+            value.ValueKind != JsonValueKind.String)
         {
-            if (!TryGetPropertyIgnoreCase(properties, name, out var value))
-            {
-                continue;
-            }
-
-            if (value.ValueKind == JsonValueKind.String &&
-                DateTime.TryParse(
-                    value.GetString(),
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsed))
-            {
-                return parsed;
-            }
+            return null;
         }
 
-        return null;
+        return DateTime.TryParse(
+            value.GetString(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     private static int? GetInt(JsonElement element, string name)
