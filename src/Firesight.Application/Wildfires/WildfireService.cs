@@ -1,3 +1,5 @@
+using Firesight.Application.Common;
+
 namespace Firesight.Application.Wildfires;
 
 public sealed class WildfireService(
@@ -22,26 +24,30 @@ public sealed class WildfireService(
         double radiusKm,
         CancellationToken cancellationToken = default)
     {
-        if (!double.IsFinite(latitude))
+        var errors = new Dictionary<string, string[]>();
+
+        if (!double.IsFinite(latitude) || latitude is < -90 or > 90)
         {
-            throw new ArgumentOutOfRangeException(nameof(latitude));
+            errors[nameof(latitude)] =
+                ["Latitude must be a finite value between -90 and 90."];
         }
 
-        if (!double.IsFinite(longitude))
+        if (!double.IsFinite(longitude) || longitude is < -180 or > 180)
         {
-            throw new ArgumentOutOfRangeException(nameof(longitude));
+            errors[nameof(longitude)] =
+                ["Longitude must be a finite value between -180 and 180."];
         }
 
-        if (!double.IsFinite(radiusKm))
+        if (!double.IsFinite(radiusKm) || radiusKm <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(radiusKm));
+            errors[nameof(radiusKm)] =
+                ["Radius must be a finite value greater than 0."];
         }
 
-        ArgumentOutOfRangeException.ThrowIfLessThan(latitude, -90);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(latitude, 90);
-        ArgumentOutOfRangeException.ThrowIfLessThan(longitude, -180);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(longitude, 180);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(radiusKm, 0);
+        if (errors.Count > 0)
+        {
+            throw new ApplicationValidationException(errors);
+        }
 
         return repository.FindNearAsync(
             latitude,

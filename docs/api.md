@@ -51,7 +51,7 @@ Query constraints:
 - `longitude`: finite value from `-180` to `180`
 - `radiusKm`: finite value greater than `0`
 
-Invalid values return `400 Bad Request` using a validation-problem response with a stable parameter-specific error message. The spatial query uses the indexed PostGIS geography column rather than loading records and calculating distances in application memory.
+Invalid values return `400 Bad Request` using a standard validation Problem Details response. Validation rules and messages originate in the Application layer; the API only translates the application validation failure into HTTP. The spatial query uses the indexed PostGIS geography column rather than loading records and calculating distances in application memory.
 
 ## Refresh CWFIS data
 
@@ -82,6 +82,16 @@ Returns dataset-level CWFIS fetch metadata, including:
 
 These values describe the dataset fetch. They do not imply that every stored wildfire was present or individually refreshed during that fetch.
 
-## API error handling status
+## API error handling
 
-Radius-search validation currently maps application-level argument validation to an HTTP validation-problem response at the endpoint. A centralized API exception-handling and Problem Details policy is still planned before the HTTP surface grows significantly.
+API exceptions are handled centrally through ASP.NET Core `IExceptionHandler` and Problem Details.
+
+Current mappings:
+
+- Application validation failures -> `400 Bad Request` with validation Problem Details
+- unexpected exceptions -> `500 Internal Server Error` with a generic Problem Details body
+- client-aborted requests -> `499 Client Closed Request` for server-side logging/status purposes
+
+Unexpected exception messages and stack traces are not returned to clients. Problem Details responses include the ASP.NET Core request `traceId` so a client-visible error can be correlated with server logs. Empty framework-generated error responses, such as a missing required query parameter or an unmatched route, are also filled by status-code middleware using Problem Details.
+
+The API does not infer client errors from broad framework exception types such as `ArgumentOutOfRangeException`; only the explicit Application validation exception is mapped to HTTP 400.

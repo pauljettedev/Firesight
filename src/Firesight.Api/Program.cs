@@ -1,4 +1,5 @@
 using Firesight.Api.Endpoints;
+using Firesight.Api.Errors;
 using Firesight.Application;
 using Firesight.Infrastructure;
 using Firesight.Infrastructure.Persistence;
@@ -9,6 +10,15 @@ using ModelContextProtocol.Server;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] =
+            context.HttpContext.TraceIdentifier;
+    };
+});
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMcpServer()
@@ -53,6 +63,8 @@ using (var scope = app.Services.CreateScope())
     await initializer.InitializeAsync();
 }
 
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 app.UseHttpsRedirection();
 
 app.MapHealthEndpoints();

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Firesight.Api.Endpoints;
+using Firesight.Api.Errors;
+using Firesight.Application.Common;
 using Firesight.Application.Wildfires;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -25,41 +27,82 @@ public sealed class WildfireEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task Near_WithOutOfRangeLatitude_ReturnsValidationProblem()
+    public async Task Near_WhenApplicationValidationFails_ReturnsValidationProblem()
     {
-        await using var app = await CreateAppAsync(new StubWildfireService());
+        var service = new StubWildfireService(
+            nearbyHandler: (_, _, _, _) =>
+                throw new ApplicationValidationException(
+                    new Dictionary<string, string[]>
+                    {
+                        ["latitude"] =
+                            ["Latitude must be a finite value between -90 and 90."]
+                    }));
+
+        await using var app = await CreateAppAsync(service);
         using var client = app.GetTestClient();
 
         var response = await client.GetAsync(
             "/api/wildfires/near?latitude=91&longitude=-75.6972&radiusKm=25");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>();
         Assert.NotNull(problem);
-        Assert.Equal("Invalid wildfire search parameters", problem.Title);
+        Assert.Equal("One or more validation errors occurred.", problem.Title);
         Assert.Equal(400, problem.Status);
+        Assert.False(string.IsNullOrWhiteSpace(problem.TraceId));
         Assert.Equal(
             ["Latitude must be a finite value between -90 and 90."],
             problem.Errors["latitude"]);
     }
 
     [Fact]
-    public async Task Near_WithZeroRadius_ReturnsValidationProblem()
+    public async Task Near_WhenUnexpectedExceptionOccurs_ReturnsGenericServerProblem()
     {
-        await using var app = await CreateAppAsync(new StubWildfireService());
+        var service = new StubWildfireService(
+            nearbyHandler: (_, _, _, _) =>
+                throw new InvalidOperationException(
+                    "database password should never reach the client"));
+
+        await using var app = await CreateAppAsync(service);
         using var client = app.GetTestClient();
 
         var response = await client.GetAsync(
-            "/api/wildfires/near?latitude=45.4215&longitude=-75.6972&radiusKm=0");
+            "/api/wildfires/near?latitude=45.4215&longitude=-75.6972&radiusKm=25");
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>();
-        Assert.NotNull(problem);
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal(
-            ["Radius must be a finite value greater than 0."],
-            problem.Errors["radiusKm"]);
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("database password", body, StringComparison.OrdinalIgnoreCase);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>();
+        Assert.NotNull(problem);
+        Assert.Equal("An unexpected error occurred.", problem.Title);
+        Assert.Equal("The request could not be completed.", problem.Detail);
+        Assert.Equal(500, problem.Status);
+        Assert.False(string.IsNullOrWhiteSpace(problem.TraceId));
+    }
+
+    [Fact]
+    public async Task Near_WhenArgumentOutOfRangeEscapesApplication_ReturnsServerError()
+    {
+        var service = new StubWildfireService(
+            nearbyHandler: (_, _, _, _) =>
+                throw new ArgumentOutOfRangeException("internalIndex"));
+
+        await using var app = await CreateAppAsync(service);
+        using var client = app.GetTestClient();
+
+        var response = await client.GetAsync(
+            "/api/wildfires/near?latitude=45.4215&longitude=-75.6972&radiusKm=25");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
     [Fact]
@@ -72,21 +115,43 @@ public sealed class WildfireEndpointsIntegrationTests
             "/api/wildfires/near?latitude=45.4215&longitude=-75.6972");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>();
+        Assert.NotNull(problem);
+        Assert.Equal(400, problem.Status);
+        Assert.False(string.IsNullOrWhiteSpace(problem.TraceId));
     }
 
     private static async Task<WebApplication> CreateAppAsync(IWildfireService service)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
+        builder.Services.AddProblemDetails(options =>
+        {
+            options.CustomizeProblemDetails = context =>
+            {
+                context.ProblemDetails.Extensions["traceId"] =
+                    context.HttpContext.TraceIdentifier;
+            };
+        });
+        builder.Services.AddExceptionHandler<ApiExceptionHandler>();
         builder.Services.AddSingleton(service);
 
         var app = builder.Build();
+        app.UseExceptionHandler();
+        app.UseStatusCodePages();
         app.MapWildfireEndpoints();
         await app.StartAsync();
         return app;
     }
 
-    private sealed class StubWildfireService : IWildfireService
+    private sealed class StubWildfireService(
+        Func<double, double, double, CancellationToken,
+            Task<IReadOnlyList<NearbyWildfireDto>>>? nearbyHandler = null)
+        : IWildfireService
     {
         public Task<IReadOnlyList<WildfireDto>> GetActiveWildfiresAsync(
             CancellationToken cancellationToken = default) =>
@@ -101,25 +166,9 @@ public sealed class WildfireEndpointsIntegrationTests
             double latitude,
             double longitude,
             double radiusKm,
-            CancellationToken cancellationToken = default)
-        {
-            if (!double.IsFinite(latitude) || latitude is < -90 or > 90)
-            {
-                throw new ArgumentOutOfRangeException(nameof(latitude));
-            }
-
-            if (!double.IsFinite(longitude) || longitude is < -180 or > 180)
-            {
-                throw new ArgumentOutOfRangeException(nameof(longitude));
-            }
-
-            if (!double.IsFinite(radiusKm) || radiusKm <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(radiusKm));
-            }
-
-            return Task.FromResult<IReadOnlyList<NearbyWildfireDto>>([]);
-        }
+            CancellationToken cancellationToken = default) =>
+            nearbyHandler?.Invoke(latitude, longitude, radiusKm, cancellationToken)
+            ?? Task.FromResult<IReadOnlyList<NearbyWildfireDto>>([]);
 
         public Task<WildfireFeedSyncStateDto?> GetFeedSyncStateAsync(
             CancellationToken cancellationToken = default) =>
@@ -133,5 +182,12 @@ public sealed class WildfireEndpointsIntegrationTests
     private sealed record ValidationProblemResponse(
         string? Title,
         int? Status,
-        Dictionary<string, string[]> Errors);
+        Dictionary<string, string[]> Errors,
+        string? TraceId);
+
+    private sealed record ProblemResponse(
+        string? Title,
+        string? Detail,
+        int? Status,
+        string? TraceId);
 }

@@ -135,3 +135,15 @@ EF Core / Npgsql
   v
 PostgreSQL/PostGIS container :5432
 ```
+
+## API error boundary
+
+`Firesight.Api` owns translation from application failures to HTTP responses, but it does not own application validation rules.
+
+The Application layer reports expected validation failures through an explicit `ApplicationValidationException` containing field-level errors. The API's centralized `IExceptionHandler` maps that known failure to HTTP 400 validation Problem Details.
+
+Unexpected exceptions are treated as server failures, logged with the ASP.NET Core trace identifier, and returned as generic HTTP 500 Problem Details without internal exception text or stack traces.
+
+Broad runtime exceptions such as `ArgumentOutOfRangeException` are deliberately not classified as client errors globally. This prevents internal programming defects from being misreported as bad requests.
+
+Client-aborted requests are handled separately from server failures so normal cancellation does not pollute error logs as an unhandled HTTP 500.

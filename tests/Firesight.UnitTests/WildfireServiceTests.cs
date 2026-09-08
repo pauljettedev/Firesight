@@ -1,3 +1,4 @@
+using Firesight.Application.Common;
 using Firesight.Application.Wildfires;
 
 namespace Firesight.UnitTests;
@@ -154,30 +155,50 @@ public sealed class WildfireServiceTests
     }
 
     [Theory]
-    [InlineData(-91, 0, 10)]
-    [InlineData(91, 0, 10)]
-    [InlineData(0, -181, 10)]
-    [InlineData(0, 181, 10)]
-    [InlineData(0, 0, 0)]
-    [InlineData(0, 0, -1)]
-    [InlineData(double.NaN, 0, 10)]
-    [InlineData(double.PositiveInfinity, 0, 10)]
-    [InlineData(0, double.NaN, 10)]
-    [InlineData(0, double.NegativeInfinity, 10)]
-    [InlineData(0, 0, double.NaN)]
-    [InlineData(0, 0, double.PositiveInfinity)]
-    public async Task FindWildfiresNearAsync_InvalidQuery_Throws(
+    [InlineData(-91, 0, 10, "latitude")]
+    [InlineData(91, 0, 10, "latitude")]
+    [InlineData(0, -181, 10, "longitude")]
+    [InlineData(0, 181, 10, "longitude")]
+    [InlineData(0, 0, 0, "radiusKm")]
+    [InlineData(0, 0, -1, "radiusKm")]
+    [InlineData(double.NaN, 0, 10, "latitude")]
+    [InlineData(double.PositiveInfinity, 0, 10, "latitude")]
+    [InlineData(0, double.NaN, 10, "longitude")]
+    [InlineData(0, double.NegativeInfinity, 10, "longitude")]
+    [InlineData(0, 0, double.NaN, "radiusKm")]
+    [InlineData(0, 0, double.PositiveInfinity, "radiusKm")]
+    public async Task FindWildfiresNearAsync_InvalidQuery_ThrowsValidationException(
         double latitude,
         double longitude,
-        double radiusKm)
+        double radiusKm,
+        string expectedField)
     {
         var service = new WildfireService(
             new StubSource(new WildfireSourceResult([], 0, 0, 0)),
             new StubRepository((0, 0, 0)),
             new StubSyncStateRepository());
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+        var exception = await Assert.ThrowsAsync<ApplicationValidationException>(
             () => service.FindWildfiresNearAsync(latitude, longitude, radiusKm));
+
+        Assert.Contains(expectedField, exception.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task FindWildfiresNearAsync_MultipleInvalidValues_ReturnsAllValidationErrors()
+    {
+        var service = new WildfireService(
+            new StubSource(new WildfireSourceResult([], 0, 0, 0)),
+            new StubRepository((0, 0, 0)),
+            new StubSyncStateRepository());
+
+        var exception = await Assert.ThrowsAsync<ApplicationValidationException>(
+            () => service.FindWildfiresNearAsync(double.NaN, 181, 0));
+
+        Assert.Equal(3, exception.Errors.Count);
+        Assert.Contains("latitude", exception.Errors.Keys);
+        Assert.Contains("longitude", exception.Errors.Keys);
+        Assert.Contains("radiusKm", exception.Errors.Keys);
     }
 
     [Fact]
