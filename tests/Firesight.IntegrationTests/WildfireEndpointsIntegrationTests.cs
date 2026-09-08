@@ -125,6 +125,32 @@ public sealed class WildfireEndpointsIntegrationTests
         Assert.False(string.IsNullOrWhiteSpace(problem.TraceId));
     }
 
+    [Fact]
+    public async Task SyncState_DoesNotExposeInternalErrorField()
+    {
+        var syncState = new WildfireFeedSyncStateDto(
+            new DateTime(2026, 9, 8, 16, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 8, 15, 0, 0, DateTimeKind.Utc),
+            false,
+            523,
+            523,
+            0);
+
+        await using var app = await CreateAppAsync(
+            new StubWildfireService(syncState: syncState));
+        using var client = app.GetTestClient();
+
+        var response = await client.GetAsync("/api/wildfires/sync-state");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("lastError", body, StringComparison.OrdinalIgnoreCase);
+
+        var returnedState = await response.Content.ReadFromJsonAsync<WildfireFeedSyncStateDto>();
+        Assert.Equal(syncState, returnedState);
+    }
+
     private static async Task<WebApplication> CreateAppAsync(IWildfireService service)
     {
         var builder = WebApplication.CreateBuilder();
@@ -150,7 +176,8 @@ public sealed class WildfireEndpointsIntegrationTests
 
     private sealed class StubWildfireService(
         Func<double, double, double, CancellationToken,
-            Task<IReadOnlyList<NearbyWildfireDto>>>? nearbyHandler = null)
+            Task<IReadOnlyList<NearbyWildfireDto>>>? nearbyHandler = null,
+        WildfireFeedSyncStateDto? syncState = null)
         : IWildfireService
     {
         public Task<IReadOnlyList<WildfireDto>> GetActiveWildfiresAsync(
@@ -172,7 +199,7 @@ public sealed class WildfireEndpointsIntegrationTests
 
         public Task<WildfireFeedSyncStateDto?> GetFeedSyncStateAsync(
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<WildfireFeedSyncStateDto?>(null);
+            Task.FromResult(syncState);
 
         public Task<WildfireSyncResult> RefreshAsync(
             CancellationToken cancellationToken = default) =>

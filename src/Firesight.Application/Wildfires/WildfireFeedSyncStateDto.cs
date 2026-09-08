@@ -6,5 +6,4 @@ public sealed record WildfireFeedSyncStateDto(
     bool LastAttemptSucceeded,
     int Received,
     int Accepted,
-    int Rejected,
-    string? LastError);
+    int Rejected);

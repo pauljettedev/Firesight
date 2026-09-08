@@ -82,6 +82,8 @@ Returns dataset-level CWFIS fetch metadata, including:
 
 These values describe the dataset fetch. They do not imply that every stored wildfire was present or individually refreshed during that fetch.
 
+Detailed sync failure messages may be retained internally for diagnostics but are not included in the public sync-state response.
+
 ## API error handling
 
 API exceptions are handled centrally through ASP.NET Core `IExceptionHandler` and Problem Details.

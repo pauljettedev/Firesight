@@ -20,8 +20,7 @@ public sealed class WildfireSyncStateRepository(FiresightDbContext dbContext)
                 state.LastAttemptSucceeded,
                 state.Received,
                 state.Accepted,
-                state.Rejected,
-                state.LastError))
+                state.Rejected))
             .SingleOrDefaultAsync(cancellationToken);
     }
 
