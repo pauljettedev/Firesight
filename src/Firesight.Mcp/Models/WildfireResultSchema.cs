@@ -64,9 +64,13 @@ public static class WildfireResultSchema
             "id",
             "externalId",
             "agency",
+            "name",
             "latitude",
             "longitude",
+            "startDate",
+            "areaHectares",
             "status",
+            "statusDateUtc",
             "lastSeenInFeedUtc",
             "isStale"
           ],
@@ -91,6 +95,28 @@ public static class WildfireResultSchema
                 {{WildfireObjectSchema}},
                 { "type": "null" }
               ]
+            }
+            """);
+
+    public static JsonElement NearbyWildfires { get; } =
+        Parse(
+            $$"""
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "wildfire": {{WildfireObjectSchema}},
+                  "distanceKm": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "wildfire",
+                  "distanceKm"
+                ],
+                "additionalProperties": false
+              }
             }
             """);
 
