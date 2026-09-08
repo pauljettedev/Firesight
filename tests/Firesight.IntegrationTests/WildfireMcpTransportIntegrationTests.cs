@@ -105,7 +105,7 @@ public sealed class WildfireMcpTransportIntegrationTests
                 ["radiusKm"] = 25d
             });
 
-        Assert.False(result.IsError);
+        Assert.NotEqual(true, result.IsError);
         Assert.NotNull(result.StructuredContent);
 
         var structuredContent = result.StructuredContent.Value;

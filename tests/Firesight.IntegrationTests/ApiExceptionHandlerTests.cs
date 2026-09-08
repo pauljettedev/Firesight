@@ -1,9 +1,11 @@
-using System.Text.Json;
+using System.Net;
+using System.Net.Http.Json;
 using Firesight.Api.Errors;
-using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Firesight.IntegrationTests;
 
@@ -12,70 +14,64 @@ public sealed class ApiExceptionHandlerTests
     [Fact]
     public async Task ClientAbortedCancellation_Returns499WithoutProblemDetailsBody()
     {
-        using var requestCancellation = new CancellationTokenSource();
-        requestCancellation.Cancel();
+        await using var app = await CreateAppAsync();
+        using var client = app.GetTestClient();
 
-        await using var services = CreateServices();
-        var handler = CreateHandler(services);
-        await using var responseBody = new MemoryStream();
+        var response = await client.GetAsync("/test/client-aborted");
 
-        var context = new DefaultHttpContext
-        {
-            RequestAborted = requestCancellation.Token,
-            RequestServices = services
-        };
-        context.Response.Body = responseBody;
-
-        var handled = await handler.TryHandleAsync(
-            context,
-            new OperationCanceledException(requestCancellation.Token),
-            CancellationToken.None);
-
-        Assert.True(handled);
-        Assert.Equal(StatusCodes.Status499ClientClosedRequest, context.Response.StatusCode);
-        Assert.Equal(0, responseBody.Length);
+        Assert.Equal((HttpStatusCode)499, response.StatusCode);
+        Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
     public async Task NonClientCancellation_Returns500ProblemDetails()
     {
-        await using var services = CreateServices();
-        var handler = CreateHandler(services);
-        await using var responseBody = new MemoryStream();
+        await using var app = await CreateAppAsync();
+        using var client = app.GetTestClient();
 
-        var context = new DefaultHttpContext
-        {
-            RequestServices = services
-        };
-        context.Response.Body = responseBody;
+        var response = await client.GetAsync("/test/internal-cancellation");
 
-        var handled = await handler.TryHandleAsync(
-            context,
-            new OperationCanceledException("Internal operation was cancelled."),
-            CancellationToken.None);
-
-        Assert.True(handled);
-        Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
-
-        responseBody.Position = 0;
-        using var json = await JsonDocument.ParseAsync(responseBody);
-        var root = json.RootElement;
-
-        Assert.Equal(500, root.GetProperty("status").GetInt32());
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal(
-            "An unexpected error occurred.",
-            root.GetProperty("title").GetString());
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>();
+
+        Assert.NotNull(problem);
+        Assert.Equal(500, problem.Status);
+        Assert.Equal("An unexpected error occurred.", problem.Title);
     }
 
-    private static ServiceProvider CreateServices()
+    private static async Task<WebApplication> CreateAppAsync()
     {
-        var services = new ServiceCollection();
-        services.AddProblemDetails();
-        return services.BuildServiceProvider();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+
+        var app = builder.Build();
+        app.UseExceptionHandler();
+
+        app.MapGet("/test/client-aborted", (HttpContext context) =>
+        {
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            context.RequestAborted = cancellation.Token;
+            throw new OperationCanceledException(cancellation.Token);
+        });
+
+        app.MapGet("/test/internal-cancellation", () =>
+        {
+            throw new OperationCanceledException("Internal operation was cancelled.");
+        });
+
+        await app.StartAsync();
+        return app;
     }
 
-    private static ApiExceptionHandler CreateHandler(IServiceProvider services) =>
-        new(
-            services.GetRequiredService<IProblemDetailsService>(),
-            NullLogger<ApiExceptionHandler>.Instance);
+    private sealed record ProblemResponse(
+        string? Title,
+        int? Status);
 }
