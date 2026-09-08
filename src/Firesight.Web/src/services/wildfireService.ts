@@ -13,11 +13,34 @@ export interface Wildfire {
   isStale: boolean
 }
 
+export interface WildfireFeedSyncState {
+  lastAttemptUtc: string
+  lastSuccessfulFetchUtc: string | null
+  lastAttemptSucceeded: boolean
+  received: number
+  accepted: number
+  rejected: number
+}
+
 export async function getWildfires(): Promise<Wildfire[]> {
   const response = await fetch('/api/wildfires')
 
   if (!response.ok) {
     throw new Error(`Wildfire request failed: ${response.status}`)
+  }
+
+  return response.json()
+}
+
+export async function getWildfireSyncState(): Promise<WildfireFeedSyncState | null> {
+  const response = await fetch('/api/wildfires/sync-state')
+
+  if (response.status === 204) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(`Wildfire sync-state request failed: ${response.status}`)
   }
 
   return response.json()

@@ -12,12 +12,18 @@ import {
 } from '@mui/material'
 import { WildfireMap } from './components/WildfireMap'
 import { getHealth, type HealthStatus } from './services/healthService'
-import { getWildfires, type Wildfire } from './services/wildfireService'
+import {
+  getWildfires,
+  getWildfireSyncState,
+  type Wildfire,
+  type WildfireFeedSyncState,
+} from './services/wildfireService'
 
 function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [healthUnavailable, setHealthUnavailable] = useState(false)
   const [wildfires, setWildfires] = useState<Wildfire[]>([])
+  const [syncState, setSyncState] = useState<WildfireFeedSyncState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,6 +32,10 @@ function App() {
       .then(setHealth)
       .catch(() => setHealthUnavailable(true))
 
+    getWildfireSyncState()
+      .then(setSyncState)
+      .catch(() => setSyncState(null))
+
     getWildfires()
       .then(setWildfires)
       .catch((err: unknown) => {
@@ -33,6 +43,10 @@ function App() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  const lastSuccessfulSync = syncState?.lastSuccessfulFetchUtc
+    ? new Date(syncState.lastSuccessfulFetchUtc).toLocaleString()
+    : 'Not available'
 
   return (
     <Box>
@@ -65,6 +79,9 @@ function App() {
                 : healthUnavailable
                   ? `System status unavailable · ${wildfires.length.toLocaleString()} fires loaded`
                   : `Loading system status… · ${wildfires.length.toLocaleString()} fires loaded`}
+            </Typography>
+            <Typography color="text.secondary">
+              Last successful CWFIS update: {lastSuccessfulSync}
             </Typography>
           </Box>
 
