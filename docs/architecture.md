@@ -64,7 +64,7 @@ Both REST endpoints and MCP tools should reuse this layer.
 
 Core domain models and domain rules.
 
-This project should remain independent of infrastructure concerns and should not reference EF Core, HTTP, OpenAI, CWFIS, or PostgreSQL.
+This project remains independent of transport, persistence, and external-system concerns. It does not reference EF Core, Npgsql, PostgreSQL, HTTP, OpenAI, or CWFIS. It does use NetTopologySuite geometry types for spatial domain data.
 
 ### Firesight.Infrastructure
 
