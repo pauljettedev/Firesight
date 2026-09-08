@@ -130,7 +130,7 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
 
         const coordinates = [...feature.geometry.coordinates] as [number, number]
         const properties = feature.properties ?? {}
-        const area = properties.areaHectares
+        const area = properties.areaHectares != null
           ? `${Number(properties.areaHectares).toLocaleString()} ha`
           : 'Area unavailable'
         const statusDate = formatTimestamp(properties.statusDateUtc)
