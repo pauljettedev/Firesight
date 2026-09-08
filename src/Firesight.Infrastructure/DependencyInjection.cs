@@ -39,14 +39,20 @@ public static class DependencyInjection
                 "Cwfis:PageSize must be between 1 and 10000.")
             .ValidateOnStart();
 
-        services.Configure<WildfireRetentionOptions>(
-            configuration.GetSection(WildfireRetentionOptions.SectionName));
+        services.AddOptions<WildfireRetentionOptions>()
+            .Bind(configuration.GetSection(WildfireRetentionOptions.SectionName))
+            .Validate(
+                options => options.ExtinguishedDays >= 0,
+                "WildfireRetention:ExtinguishedDays must be zero or greater.")
+            .ValidateOnStart();
+
         services.AddOptions<WildfireFreshnessOptions>()
             .Bind(configuration.GetSection(WildfireFreshnessOptions.SectionName))
             .Validate(
                 options => options.StaleAfterHours is >= 1 and <= 720,
                 "WildfireFreshness:StaleAfterHours must be between 1 and 720 hours.")
             .ValidateOnStart();
+
         services.AddHttpClient<IWildfireSource, CwfisWildfireSource>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
