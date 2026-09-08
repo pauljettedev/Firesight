@@ -15,6 +15,24 @@ Current implementation:
 
 The importer targets the current CWFIS 2.0 active-fire schema rather than attempting to support legacy property-name aliases. GeoJSON point geometry is used for location when available, with the layer's latitude/longitude fields available as the corresponding source coordinates.
 
+## Current-snapshot query
+
+Despite its name, `public:cwfif_national_activefires` is a time-versioned layer containing historical observations as well as the current state. Requesting the layer without a temporal filter returns historical records, including multiple observations for the same `national_fire_id`.
+
+Firesight queries only the records valid at the instant the synchronization begins. The WFS request applies the same validity rule used by the CWFIS interactive map:
+
+```text
+record_start <= <snapshot UTC>
+AND
+record_end > <snapshot UTC>
+```
+
+`record_start` and `record_end` describe the validity window of a CWFIS layer record. They are not interpreted as wildfire start or extinguishment dates.
+
+The CWFIS GeoServer layer does not expose a primary key that GeoServer can use for natural-order paging. A paged request using `startIndex` without an explicit sort is rejected by the server. Firesight therefore requests a deterministic manual sort on `national_fire_id` and pages through the filtered current snapshot using `count` and `startIndex`.
+
+The snapshot timestamp is captured once per synchronization attempt and reused for every page so that a multi-page fetch cannot drift across different validity instants. If any page fails, the source fetch fails rather than treating a partial set of pages as a successful dataset refresh.
+
 ## CWFIS 2.0 active-fire schema
 
 Firesight maps the current `public:cwfif_national_activefires` fields as follows:

@@ -26,38 +26,76 @@ public sealed class CwfisWildfireSource(
     {
         var result = new List<WildfireImportRecord>();
         var received = 0;
+        var startIndex = 0;
+        var snapshotUtc = DateTime.UtcNow;
 
-        using var response = await httpClient.GetAsync(
-            BuildRequestUri(),
-            cancellationToken);
-
-        response.EnsureSuccessStatusCode();
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-        var root = document.RootElement;
-        if (!root.TryGetProperty("features", out var features) ||
-            features.ValueKind != JsonValueKind.Array)
+        while (true)
         {
-            throw new InvalidOperationException(
-                "CWFIS response did not contain a GeoJSON features array.");
-        }
+            using var response = await httpClient.GetAsync(
+                BuildRequestUri(snapshotUtc, startIndex),
+                cancellationToken);
 
-        foreach (var feature in features.EnumerateArray())
-        {
-            received++;
-            var wildfire = ParseFeature(feature, out var rejectionReason);
-            if (wildfire is not null)
+            response.EnsureSuccessStatusCode();
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(
+                stream,
+                cancellationToken: cancellationToken);
+
+            var root = document.RootElement;
+            if (!root.TryGetProperty("features", out var features) ||
+                features.ValueKind != JsonValueKind.Array)
             {
-                result.Add(wildfire);
+                throw new InvalidOperationException(
+                    "CWFIS response did not contain a GeoJSON features array.");
+            }
+
+            foreach (var feature in features.EnumerateArray())
+            {
+                received++;
+                var wildfire = ParseFeature(feature, out var rejectionReason);
+                if (wildfire is not null)
+                {
+                    result.Add(wildfire);
+                    continue;
+                }
+
+                logger.LogWarning(
+                    "Rejected CWFIS feature {FeatureId}: {Reason}.",
+                    GetFeatureId(feature) ?? "(unknown)",
+                    rejectionReason);
+            }
+
+            var numberReturned = features.GetArrayLength();
+            var numberMatched = GetInt(root, "numberMatched");
+
+            if (numberReturned == 0)
+            {
+                if (numberMatched is not null && startIndex < numberMatched.Value)
+                {
+                    throw new InvalidOperationException(
+                        $"CWFIS paging ended after {startIndex} of {numberMatched.Value} matched records.");
+                }
+
+                break;
+            }
+
+            startIndex += numberReturned;
+
+            if (numberMatched is not null)
+            {
+                if (startIndex >= numberMatched.Value)
+                {
+                    break;
+                }
+
                 continue;
             }
 
-            logger.LogWarning(
-                "Rejected CWFIS feature {FeatureId}: {Reason}.",
-                GetFeatureId(feature) ?? "(unknown)",
-                rejectionReason);
+            if (numberReturned < _options.PageSize)
+            {
+                break;
+            }
         }
 
         return new WildfireSourceResult(
@@ -67,8 +105,15 @@ public sealed class CwfisWildfireSource(
             received - result.Count);
     }
 
-    private string BuildRequestUri()
+    private string BuildRequestUri(DateTime snapshotUtc, int startIndex)
     {
+        var snapshot = snapshotUtc.ToString(
+            "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+            CultureInfo.InvariantCulture);
+
+        var currentSnapshotFilter =
+            $"record_start <= '{snapshot}' AND record_end > '{snapshot}'";
+
         var query = new Dictionary<string, string>
         {
             ["service"] = "WFS",
@@ -77,7 +122,10 @@ public sealed class CwfisWildfireSource(
             ["typeNames"] = _options.ActiveFiresLayer,
             ["outputFormat"] = "application/json",
             ["srsName"] = "EPSG:4326",
-            ["count"] = _options.PageSize.ToString(CultureInfo.InvariantCulture)
+            ["count"] = _options.PageSize.ToString(CultureInfo.InvariantCulture),
+            ["startIndex"] = startIndex.ToString(CultureInfo.InvariantCulture),
+            ["sortBy"] = "national_fire_id",
+            ["cql_filter"] = currentSnapshotFilter
         };
 
         var queryString = string.Join("&", query.Select(pair =>
@@ -242,6 +290,14 @@ public sealed class CwfisWildfireSource(
         return null;
     }
 
+    private static int? GetInt(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) &&
+               TryGetInt(value, out var parsed)
+            ? parsed
+            : null;
+    }
+
     private static bool TryGetDouble(JsonElement value, out double result)
     {
         if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out result))
@@ -271,7 +327,11 @@ public sealed class CwfisWildfireSource(
         }
 
         if (value.ValueKind == JsonValueKind.String &&
-            int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out result))
+            int.TryParse(
+                value.GetString(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out result))
         {
             return true;
         }
@@ -297,6 +357,4 @@ public sealed class CwfisWildfireSource(
         value = default;
         return false;
     }
-
-
 }
