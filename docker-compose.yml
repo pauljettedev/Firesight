@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgis/postgis:latest
+    image: postgis/postgis:16-3.4
     container_name: firesight-postgres
     environment:
       POSTGRES_DB: firesight
