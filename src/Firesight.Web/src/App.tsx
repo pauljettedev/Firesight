@@ -16,16 +16,18 @@ import { getWildfires, type Wildfire } from './services/wildfireService'
 
 function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [healthUnavailable, setHealthUnavailable] = useState(false)
   const [wildfires, setWildfires] = useState<Wildfire[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getHealth(), getWildfires()])
-      .then(([healthStatus, wildfireData]) => {
-        setHealth(healthStatus)
-        setWildfires(wildfireData)
-      })
+    getHealth()
+      .then(setHealth)
+      .catch(() => setHealthUnavailable(true))
+
+    getWildfires()
+      .then(setWildfires)
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : 'Firesight failed to load')
       })
@@ -60,7 +62,9 @@ function App() {
             <Typography color="text.secondary">
               {health
                 ? `API ${health.status} · Database ${health.database} · ${wildfires.length.toLocaleString()} fires loaded`
-                : 'Loading system status…'}
+                : healthUnavailable
+                  ? `System status unavailable · ${wildfires.length.toLocaleString()} fires loaded`
+                  : `Loading system status… · ${wildfires.length.toLocaleString()} fires loaded`}
             </Typography>
           </Box>
 
