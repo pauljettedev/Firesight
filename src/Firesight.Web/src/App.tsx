@@ -12,7 +12,7 @@ import {
 } from '@mui/material'
 import { WildfireMap } from './components/WildfireMap'
 import { getHealth, type HealthStatus } from './services/healthService'
-import { getWildfiresWithInitialSync, type Wildfire } from './services/wildfireService'
+import { getWildfires, type Wildfire } from './services/wildfireService'
 
 function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
@@ -21,7 +21,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getHealth(), getWildfiresWithInitialSync()])
+    Promise.all([getHealth(), getWildfires()])
       .then(([healthStatus, wildfireData]) => {
         setHealth(healthStatus)
         setWildfires(wildfireData)

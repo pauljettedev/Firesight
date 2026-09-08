@@ -42,14 +42,6 @@ public static class WildfireEndpoints
             return state is null ? Results.NoContent() : Results.Ok(state);
         });
 
-        group.MapPost("/sync", async (
-            IWildfireService service,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await service.RefreshAsync(cancellationToken);
-            return Results.Ok(result);
-        });
-
         return endpoints;
     }
 }

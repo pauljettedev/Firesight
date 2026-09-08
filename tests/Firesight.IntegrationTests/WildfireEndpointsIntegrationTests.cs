@@ -151,6 +151,17 @@ public sealed class WildfireEndpointsIntegrationTests
         Assert.Equal(syncState, returnedState);
     }
 
+    [Fact]
+    public async Task Sync_IsNotExposedAsPublicEndpoint()
+    {
+        await using var app = await CreateAppAsync(new StubWildfireService());
+        using var client = app.GetTestClient();
+
+        var response = await client.PostAsync("/api/wildfires/sync", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private static async Task<WebApplication> CreateAppAsync(IWildfireService service)
     {
         var builder = WebApplication.CreateBuilder();

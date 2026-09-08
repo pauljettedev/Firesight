@@ -53,17 +53,13 @@ Query constraints:
 
 Invalid values return `400 Bad Request` using a standard validation Problem Details response. Validation rules and messages originate in the Application layer; the API only translates the application validation failure into HTTP. The spatial query uses the indexed PostGIS geography column rather than loading records and calculating distances in application memory.
 
-## Refresh CWFIS data
+## CWFIS synchronization
 
-```http
-POST /api/wildfires/sync
-```
+CWFIS data acquisition is owned by the backend. The hosted synchronization service refreshes the current CWFIS snapshot at application startup and then hourly.
 
-Triggers an immediate pull from the CWFIS 2.0 WFS active-fire layer and upserts accepted records by `national_fire_id` / `ExternalId`.
+The public API does not expose an endpoint that triggers synchronization. Refresh failures are non-fatal; existing stored data remains available.
 
 Features without `national_fire_id` are rejected rather than assigned a generated identifier.
-
-The API also performs a refresh at startup and then hourly. Refresh failures are non-fatal; existing stored data remains available.
 
 ## CWFIS feed sync state
 
