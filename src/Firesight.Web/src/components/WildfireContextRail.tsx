@@ -3,18 +3,15 @@ import {
   Box,
   Button,
   ButtonGroup,
-  Chip,
   Divider,
   Paper,
   Stack,
   Typography,
 } from '@mui/material'
-import type { ChipProps } from '@mui/material'
 import type { Wildfire } from '../services/wildfireService'
 import {
   formatArea,
   formatRelativeTime,
-  formatTimestamp,
   stageOfControlLabel,
 } from '../utils/wildfirePresentation'
 import { NearbyWildfireSearch } from './NearbyWildfireSearch'
@@ -22,13 +19,11 @@ import { NearbyWildfireSearch } from './NearbyWildfireSearch'
 type RailMode = 'recent' | 'nearby'
 
 interface WildfireContextRailProps {
-  selectedWildfire: Wildfire | null
   recentWildfires: Wildfire[]
   onWildfireSelect: (wildfire: Wildfire | null) => void
 }
 
 export function WildfireContextRail({
-  selectedWildfire,
   recentWildfires,
   onWildfireSelect,
 }: WildfireContextRailProps) {
@@ -45,19 +40,13 @@ export function WildfireContextRail({
         >
           <Button
             variant={mode === 'recent' ? 'contained' : 'outlined'}
-            onClick={() => {
-              onWildfireSelect(null)
-              setMode('recent')
-            }}
+            onClick={() => setMode('recent')}
           >
             Recent
           </Button>
           <Button
             variant={mode === 'nearby' ? 'contained' : 'outlined'}
-            onClick={() => {
-              onWildfireSelect(null)
-              setMode('nearby')
-            }}
+            onClick={() => setMode('nearby')}
           >
             Nearby
           </Button>
@@ -65,90 +54,13 @@ export function WildfireContextRail({
       </Box>
 
       <Box sx={{ p: 2.25 }}>
-        {selectedWildfire ? (
-          <SelectedWildfire
-            wildfire={selectedWildfire}
-            onBack={() => onWildfireSelect(null)}
-          />
-        ) : mode === 'nearby' ? (
+        {mode === 'nearby' ? (
           <NearbyWildfireSearch onSelect={onWildfireSelect} />
         ) : (
           <RecentlyUpdated wildfires={recentWildfires} />
         )}
       </Box>
     </Paper>
-  )
-}
-
-function SelectedWildfire({
-  wildfire,
-  onBack,
-}: {
-  wildfire: Wildfire
-  onBack: () => void
-}) {
-  const title = wildfire.name ?? `${wildfire.agency} wildfire`
-
-  return (
-    <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-        }}
-      >
-        <Typography
-          variant="overline"
-          color="text.secondary"
-          sx={{ letterSpacing: '0.1em' }}
-        >
-          Selected fire
-        </Typography>
-        <Button size="small" onClick={onBack}>
-          Back
-        </Button>
-      </Box>
-
-      <Typography variant="h6" sx={{ mt: 0.5, lineHeight: 1.2 }}>
-        {title}
-      </Typography>
-
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block', mt: 0.25 }}
-      >
-        {wildfire.externalId}
-      </Typography>
-
-      <Chip
-        label={stageOfControlLabel(wildfire.status)}
-        color={statusChipColor(wildfire.status)}
-        variant="outlined"
-        size="small"
-        sx={{ mt: 1.5, fontWeight: 700 }}
-      />
-
-      <Stack spacing={1.5} sx={{ mt: 2 }}>
-        <InfoItem label="Area" value={formatArea(wildfire.areaHectares)} />
-        <InfoItem label="Agency" value={wildfire.agency} />
-        <InfoItem
-          label="Status updated"
-          value={formatTimestamp(wildfire.statusDateUtc)}
-        />
-        <InfoItem
-          label="Last seen in feed"
-          value={formatTimestamp(wildfire.lastSeenInFeedUtc)}
-        />
-        <InfoItem
-          label="Freshness"
-          value={wildfire.isStale ? 'Stale observation' : 'Recent observation'}
-          valueColor={wildfire.isStale ? 'warning.main' : 'success.main'}
-        />
-      </Stack>
-    </Box>
   )
 }
 
@@ -213,39 +125,6 @@ function RecentlyUpdated({ wildfires }: { wildfires: Wildfire[] }) {
   )
 }
 
-function InfoItem({
-  label,
-  value,
-  valueColor = 'text.primary',
-}: {
-  label: string
-  value: string
-  valueColor?: string
-}) {
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          mt: 0.2,
-          fontWeight: 600,
-          color: valueColor,
-          overflowWrap: 'anywhere',
-        }}
-      >
-        {value}
-      </Typography>
-    </Box>
-  )
-}
-
 function StatusDot({ status }: { status: string }) {
   return (
     <Box
@@ -259,15 +138,6 @@ function StatusDot({ status }: { status: string }) {
       }}
     />
   )
-}
-
-function statusChipColor(status: string): ChipProps['color'] {
-  switch (status.toUpperCase()) {
-    case 'OC': return 'error'
-    case 'BH': return 'warning'
-    case 'UC': return 'success'
-    default: return 'default'
-  }
 }
 
 function statusColor(status: string): string {

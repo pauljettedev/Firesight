@@ -9,7 +9,6 @@ import {
   Typography,
 } from '@mui/material'
 import { AppHeader } from './components/AppHeader'
-import { DemoNotice } from './components/DemoNotice'
 import { ObservationFreshnessChart } from './components/ObservationFreshnessChart'
 import { WildfireContextRail } from './components/WildfireContextRail'
 import { WildfireMap } from './components/WildfireMap'
@@ -69,27 +68,6 @@ function App() {
         }}
       >
         <Stack spacing={2}>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              alignItems: { xs: 'flex-start', md: 'center' },
-              justifyContent: 'space-between',
-              gap: 1.25,
-            }}
-          >
-            <Box sx={{ flex: '0 0 auto' }}>
-              <Typography variant="h5" component="h2">
-                Active wildfires in Canada
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Current and recently observed wildfire records from CWFIS
-              </Typography>
-            </Box>
-
-            <DemoNotice />
-          </Box>
-
           <Paper
             variant="outlined"
             sx={{
@@ -150,7 +128,6 @@ function App() {
               }}
             >
               <WildfireContextRail
-                selectedWildfire={selectedWildfire}
                 recentWildfires={recentWildfires}
                 onWildfireSelect={setSelectedWildfire}
               />

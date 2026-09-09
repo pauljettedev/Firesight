@@ -1,6 +1,7 @@
-import { Box } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import firesightHeaderBackground from '../assets/firesight-header-background.png'
 import firesightLogo from '../assets/firesight-logo.png'
+import { DemoNotice } from './DemoNotice'
 
 export function AppHeader() {
   return (
@@ -8,16 +9,16 @@ export function AppHeader() {
       component="header"
       sx={{
         position: 'relative',
-        height: { xs: 76, md: 92 },
+        minHeight: { xs: 110, md: 92 },
         borderBottom: '1px solid',
         borderColor: 'divider',
         backgroundColor: 'background.default',
         backgroundImage: `
           linear-gradient(
             90deg,
-            rgba(8, 14, 20, 0.72) 0%,
-            rgba(8, 14, 20, 0.22) 42%,
-            rgba(8, 14, 20, 0.38) 100%
+            rgba(8, 14, 20, 0.78) 0%,
+            rgba(8, 14, 20, 0.28) 46%,
+            rgba(8, 14, 20, 0.58) 100%
           ),
           url(${firesightHeaderBackground})
         `,
@@ -28,22 +29,77 @@ export function AppHeader() {
       }}
     >
       <Box
-        component="img"
-        src={firesightLogo}
-        alt="Firesight"
         sx={{
-          position: 'absolute',
-          left: { xs: 12, md: 20 },
-          top: '50%',
-          transform: 'translateY(-50%)',
-          display: 'block',
-          width: 'auto',
-          height: { xs: 68, md: 84 },
-          maxWidth: '42vw',
-          objectFit: 'contain',
-          filter: 'drop-shadow(0 4px 10px rgba(0, 0, 0, 0.42))',
+          minHeight: 'inherit',
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'auto 1fr',
+            md: 'auto minmax(260px, 1fr) auto',
+          },
+          alignItems: 'center',
+          gap: { xs: 0.75, md: 1 },
+          px: { xs: 1.5, md: 2.5 },
+          py: { xs: 1, md: 0 },
         }}
-      />
+      >
+        <Box
+          component="img"
+          src={firesightLogo}
+          alt="Firesight"
+          sx={{
+            display: 'block',
+            width: 'auto',
+            height: { xs: 68, md: 84 },
+            maxWidth: { xs: 110, md: 120 },
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 4px 10px rgba(0, 0, 0, 0.42))',
+          }}
+        />
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="h5"
+            component="h1"
+            sx={{
+              fontSize: { xs: '1rem', md: '1.35rem' },
+              lineHeight: 1.2,
+              textShadow: '0 1px 4px rgba(0, 0, 0, 0.75)',
+            }}
+          >
+            Active wildfires in Canada
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 0.25,
+              color: 'rgba(238, 244, 247, 0.82)',
+              fontSize: { xs: '0.72rem', md: '0.82rem' },
+              textShadow: '0 1px 4px rgba(0, 0, 0, 0.75)',
+            }}
+          >
+            Current and recently observed wildfire records from CWFIS
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            justifySelf: 'end',
+          }}
+        >
+          <DemoNotice />
+        </Box>
+      </Box>
+
+      <Box
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          px: 1.5,
+          pb: 1,
+        }}
+      >
+        <DemoNotice />
+      </Box>
     </Box>
   )
 }
