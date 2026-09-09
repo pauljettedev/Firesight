@@ -5,10 +5,12 @@ import {
   Button,
   CircularProgress,
   Divider,
+  Link,
   Stack,
   TextField,
   Typography,
 } from '@mui/material'
+import { geocodeLocation } from '../services/locationService'
 import {
   getNearbyWildfires,
   type NearbyWildfire,
@@ -27,33 +29,19 @@ interface NearbyWildfireSearchProps {
 export function NearbyWildfireSearch({
   onSelect,
 }: NearbyWildfireSearchProps) {
-  const [latitude, setLatitude] = useState('45.4215')
-  const [longitude, setLongitude] = useState('-75.6972')
+  const [locationQuery, setLocationQuery] = useState('')
   const [radiusKm, setRadiusKm] = useState('25')
+  const [resolvedLocation, setResolvedLocation] = useState<string | null>(null)
   const [results, setResults] = useState<NearbyWildfire[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSearch() {
-    const parsedLatitude = Number(latitude)
-    const parsedLongitude = Number(longitude)
+    const query = locationQuery.trim()
     const parsedRadiusKm = Number(radiusKm)
 
-    if (
-      !Number.isFinite(parsedLatitude) ||
-      parsedLatitude < -90 ||
-      parsedLatitude > 90
-    ) {
-      setError('Latitude must be between -90 and 90.')
-      return
-    }
-
-    if (
-      !Number.isFinite(parsedLongitude) ||
-      parsedLongitude < -180 ||
-      parsedLongitude > 180
-    ) {
-      setError('Longitude must be between -180 and 180.')
+    if (!query) {
+      setError('Enter a town or city.')
       return
     }
 
@@ -66,13 +54,23 @@ export function NearbyWildfireSearch({
     setError(null)
 
     try {
-      setResults(
-        await getNearbyWildfires(
-          parsedLatitude,
-          parsedLongitude,
-          parsedRadiusKm,
-        ),
+      const location = await geocodeLocation(query)
+
+      if (!location) {
+        setResolvedLocation(null)
+        setResults(null)
+        setError('Location not found in Canada.')
+        return
+      }
+
+      const nearbyWildfires = await getNearbyWildfires(
+        location.latitude,
+        location.longitude,
+        parsedRadiusKm,
       )
+
+      setResolvedLocation(location.displayName)
+      setResults(nearbyWildfires)
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -95,42 +93,23 @@ export function NearbyWildfireSearch({
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-        Search the existing wildfire dataset around a coordinate.
+        Search for wildfires near a Canadian town or city.
       </Typography>
 
       <Stack spacing={1.25} sx={{ mt: 1.5 }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 1,
+        <TextField
+          label="Town or city"
+          placeholder="Ottawa, ON"
+          value={locationQuery}
+          onChange={(event) => setLocationQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !loading) {
+              void handleSearch()
+            }
           }}
-        >
-          <TextField
-            label="Latitude"
-            value={latitude}
-            onChange={(event) => setLatitude(event.target.value)}
-            size="small"
-            type="number"
-            slotProps={{
-              htmlInput: {
-                step: 'any',
-              },
-            }}
-          />
-          <TextField
-            label="Longitude"
-            value={longitude}
-            onChange={(event) => setLongitude(event.target.value)}
-            size="small"
-            type="number"
-            slotProps={{
-              htmlInput: {
-                step: 'any',
-              },
-            }}
-          />
-        </Box>
+          size="small"
+          autoComplete="off"
+        />
 
         <TextField
           label="Radius (km)"
@@ -148,7 +127,7 @@ export function NearbyWildfireSearch({
 
         <Button
           variant="contained"
-          onClick={handleSearch}
+          onClick={() => void handleSearch()}
           disabled={loading}
           fullWidth
         >
@@ -160,10 +139,31 @@ export function NearbyWildfireSearch({
         </Button>
 
         {error && <Alert severity="error">{error}</Alert>}
+
+        <Typography variant="caption" color="text.secondary">
+          Location search ©{' '}
+          <Link
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noreferrer"
+          >
+            OpenStreetMap contributors
+          </Link>
+        </Typography>
       </Stack>
 
       {results && (
         <Box sx={{ mt: 2 }}>
+          {resolvedLocation && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', mb: 0.5 }}
+            >
+              Near {resolvedLocation}
+            </Typography>
+          )}
+
           <Typography variant="body2" sx={{ fontWeight: 700 }}>
             {results.length.toLocaleString()} fires found
           </Typography>

@@ -45,6 +45,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.MapHealthEndpoints();
+app.MapLocationEndpoints();
 app.MapWildfireEndpoints();
 app.MapMcp("/mcp");
 

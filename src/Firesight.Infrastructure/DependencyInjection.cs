@@ -1,11 +1,14 @@
+using Firesight.Application.Locations;
 using Firesight.Application.Wildfires;
 using Firesight.Infrastructure.Cwfis;
 using Firesight.Infrastructure.HostedServices;
+using Firesight.Infrastructure.Nominatim;
 using Firesight.Infrastructure.Persistence;
 using Firesight.Infrastructure.Wildfires;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Firesight.Infrastructure;
 
@@ -39,6 +42,15 @@ public static class DependencyInjection
                 "Cwfis:PageSize must be between 1 and 10000.")
             .ValidateOnStart();
 
+        services.AddOptions<NominatimOptions>()
+            .Bind(configuration.GetSection(NominatimOptions.SectionName))
+            .Validate(
+                options =>
+                    Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps),
+                "Nominatim:BaseUrl must be a valid absolute HTTP or HTTPS URL.")
+            .ValidateOnStart();
+
         services.AddOptions<WildfireRetentionOptions>()
             .Bind(configuration.GetSection(WildfireRetentionOptions.SectionName))
             .Validate(
@@ -58,6 +70,20 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Firesight/0.1");
         });
+
+        services.AddHttpClient<ILocationGeocoder, NominatimLocationGeocoder>(
+            (serviceProvider, client) =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptions<NominatimOptions>>()
+                    .Value;
+
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Firesight/0.1");
+                client.DefaultRequestHeaders.Referrer =
+                    new Uri("https://github.com/pauljettedev/Firesight");
+            });
 
         services.AddScoped<IWildfireRepository, WildfireRepository>();
         services.AddScoped<IWildfireSyncStateRepository, WildfireSyncStateRepository>();
