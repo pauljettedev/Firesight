@@ -10,6 +10,7 @@ import {
 } from '@mui/material'
 import { AppHeader } from './components/AppHeader'
 import { DemoNotice } from './components/DemoNotice'
+import { ObservationFreshnessChart } from './components/ObservationFreshnessChart'
 import { WildfireContextRail } from './components/WildfireContextRail'
 import { WildfireMap } from './components/WildfireMap'
 import { getHealth, type HealthStatus } from './services/healthService'
@@ -177,7 +178,7 @@ function App() {
                   lg: '300px minmax(0, 1fr)',
                 },
                 gap: 2,
-                alignItems: 'stretch',
+                alignItems: 'start',
               }}
             >
               <WildfireContextRail
@@ -189,21 +190,25 @@ function App() {
                 staleCount={staleCount}
               />
 
-              <Paper
-                variant="outlined"
-                sx={{
-                  overflow: 'hidden',
-                  minWidth: 0,
-                  '& > div': {
-                    borderRadius: 0,
-                  },
-                }}
-              >
-                <WildfireMap
-                  wildfires={wildfires}
-                  onWildfireSelect={setSelectedWildfire}
-                />
-              </Paper>
+              <Stack spacing={2} sx={{ minWidth: 0 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    overflow: 'hidden',
+                    minWidth: 0,
+                    '& > div': {
+                      borderRadius: 0,
+                    },
+                  }}
+                >
+                  <WildfireMap
+                    wildfires={wildfires}
+                    onWildfireSelect={setSelectedWildfire}
+                  />
+                </Paper>
+
+                <ObservationFreshnessChart wildfires={wildfires} />
+              </Stack>
             </Box>
           )}
         </Stack>
