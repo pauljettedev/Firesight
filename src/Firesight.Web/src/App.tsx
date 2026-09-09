@@ -152,6 +152,7 @@ function App() {
               <WildfireContextRail
                 selectedWildfire={selectedWildfire}
                 recentWildfires={recentWildfires}
+                onWildfireSelect={setSelectedWildfire}
               />
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>
@@ -167,6 +168,7 @@ function App() {
                 >
                   <WildfireMap
                     wildfires={wildfires}
+                    selectedWildfire={selectedWildfire}
                     onWildfireSelect={setSelectedWildfire}
                   />
                 </Paper>

@@ -22,11 +22,36 @@ export interface WildfireFeedSyncState {
   rejected: number
 }
 
+export interface NearbyWildfire {
+  wildfire: Wildfire
+  distanceKm: number
+}
+
 export async function getWildfires(): Promise<Wildfire[]> {
   const response = await fetch('/api/wildfires')
 
   if (!response.ok) {
     throw new Error(`Wildfire request failed: ${response.status}`)
+  }
+
+  return response.json()
+}
+
+export async function getNearbyWildfires(
+  latitude: number,
+  longitude: number,
+  radiusKm: number,
+): Promise<NearbyWildfire[]> {
+  const query = new URLSearchParams({
+    latitude: latitude.toString(),
+    longitude: longitude.toString(),
+    radiusKm: radiusKm.toString(),
+  })
+
+  const response = await fetch(`/api/wildfires/near?${query}`)
+
+  if (!response.ok) {
+    throw new Error(`Nearby wildfire request failed: ${response.status}`)
   }
 
   return response.json()

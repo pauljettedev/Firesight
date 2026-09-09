@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import {
   Box,
+  Button,
+  ButtonGroup,
   Chip,
   Divider,
   Paper,
@@ -14,21 +17,61 @@ import {
   formatTimestamp,
   stageOfControlLabel,
 } from '../utils/wildfirePresentation'
+import { NearbyWildfireSearch } from './NearbyWildfireSearch'
+
+type RailMode = 'recent' | 'nearby'
 
 interface WildfireContextRailProps {
   selectedWildfire: Wildfire | null
   recentWildfires: Wildfire[]
+  onWildfireSelect: (wildfire: Wildfire | null) => void
 }
 
 export function WildfireContextRail({
   selectedWildfire,
   recentWildfires,
+  onWildfireSelect,
 }: WildfireContextRailProps) {
+  const [mode, setMode] = useState<RailMode>('recent')
+
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden', minWidth: 0 }}>
+      <Box sx={{ p: 1.25, pb: 0 }}>
+        <ButtonGroup
+          size="small"
+          fullWidth
+          variant="outlined"
+          aria-label="Wildfire context"
+        >
+          <Button
+            variant={mode === 'recent' ? 'contained' : 'outlined'}
+            onClick={() => {
+              onWildfireSelect(null)
+              setMode('recent')
+            }}
+          >
+            Recent
+          </Button>
+          <Button
+            variant={mode === 'nearby' ? 'contained' : 'outlined'}
+            onClick={() => {
+              onWildfireSelect(null)
+              setMode('nearby')
+            }}
+          >
+            Nearby
+          </Button>
+        </ButtonGroup>
+      </Box>
+
       <Box sx={{ p: 2.25 }}>
         {selectedWildfire ? (
-          <SelectedWildfire wildfire={selectedWildfire} />
+          <SelectedWildfire
+            wildfire={selectedWildfire}
+            onBack={() => onWildfireSelect(null)}
+          />
+        ) : mode === 'nearby' ? (
+          <NearbyWildfireSearch onSelect={onWildfireSelect} />
         ) : (
           <RecentlyUpdated wildfires={recentWildfires} />
         )}
@@ -37,18 +80,36 @@ export function WildfireContextRail({
   )
 }
 
-function SelectedWildfire({ wildfire }: { wildfire: Wildfire }) {
+function SelectedWildfire({
+  wildfire,
+  onBack,
+}: {
+  wildfire: Wildfire
+  onBack: () => void
+}) {
   const title = wildfire.name ?? `${wildfire.agency} wildfire`
 
   return (
     <Box>
-      <Typography
-        variant="overline"
-        color="text.secondary"
-        sx={{ letterSpacing: '0.1em' }}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+        }}
       >
-        Selected fire
-      </Typography>
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          sx={{ letterSpacing: '0.1em' }}
+        >
+          Selected fire
+        </Typography>
+        <Button size="small" onClick={onBack}>
+          Back
+        </Button>
+      </Box>
 
       <Typography variant="h6" sx={{ mt: 0.5, lineHeight: 1.2 }}>
         {title}

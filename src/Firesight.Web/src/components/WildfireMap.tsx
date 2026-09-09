@@ -13,6 +13,7 @@ import { WildfirePopup } from './WildfirePopup'
 
 interface WildfireMapProps {
   wildfires: Wildfire[]
+  selectedWildfire?: Wildfire | null
   onWildfireSelect?: (wildfire: Wildfire | null) => void
 }
 
@@ -56,12 +57,16 @@ const circleRadius: ExpressionSpecification = [
 
 export function WildfireMap({
   wildfires,
+  selectedWildfire,
   onWildfireSelect,
 }: WildfireMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const wildfiresRef = useRef(wildfires)
+  const selectedWildfireRef = useRef(selectedWildfire)
   const onWildfireSelectRef = useRef(onWildfireSelect)
+  const activePopupRef = useRef<maplibregl.Popup | null>(null)
+  const activePopupWildfireIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     wildfiresRef.current = wildfires
@@ -72,11 +77,13 @@ export function WildfireMap({
   }, [onWildfireSelect])
 
   useEffect(() => {
+    selectedWildfireRef.current = selectedWildfire
+  }, [selectedWildfire])
+
+  useEffect(() => {
     if (!containerRef.current || mapRef.current) {
       return
     }
-
-    let activePopup: maplibregl.Popup | null = null
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -98,10 +105,10 @@ export function WildfireMap({
             type: 'raster',
             source: 'osm',
             paint: {
-              'raster-saturation': -0.72,
-              'raster-contrast': 0.16,
-              'raster-brightness-min': 0.08,
-              'raster-brightness-max': 0.58,
+              'raster-saturation': -0.35,
+              'raster-contrast': 0.28,
+              'raster-brightness-min': 0.05,
+              'raster-brightness-max': 0.82,
             },
           },
         ],
@@ -170,12 +177,13 @@ export function WildfireMap({
         const coordinates = [...feature.geometry.coordinates] as [number, number]
         const properties = feature.properties ?? {}
         const selectedId = String(properties.id ?? noSelectionId)
-        const selectedWildfire =
-          wildfiresRef.current.find((wildfire) => wildfire.id === selectedId) ?? null
+        const selected =
+          wildfiresRef.current.find((wildfire) => wildfire.id === selectedId) ??
+          null
 
-        activePopup?.remove()
+        activePopupRef.current?.remove()
         map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
-        onWildfireSelectRef.current?.(selectedWildfire)
+        onWildfireSelectRef.current?.(selected)
 
         const popupContent = document.createElement('div')
         const popupRoot = createRoot(popupContent)
@@ -201,22 +209,27 @@ export function WildfireMap({
           .setDOMContent(popupContent)
           .addTo(map)
 
-        activePopup = popup
+        activePopupRef.current = popup
+        activePopupWildfireIdRef.current = selectedId
 
         popup.on('close', () => {
           popupRoot.unmount()
 
-          if (activePopup !== popup) {
+          if (activePopupRef.current !== popup) {
             return
           }
 
-          activePopup = null
+          activePopupRef.current = null
+          activePopupWildfireIdRef.current = null
           map.setFilter(selectionLayerId, [
             '==',
             ['get', 'id'],
             noSelectionId,
           ])
-          onWildfireSelectRef.current?.(null)
+
+          if (selectedWildfireRef.current?.id === selectedId) {
+            onWildfireSelectRef.current?.(null)
+          }
         })
       })
 
@@ -232,7 +245,9 @@ export function WildfireMap({
     mapRef.current = map
 
     return () => {
-      activePopup?.remove()
+      activePopupRef.current?.remove()
+      activePopupRef.current = null
+      activePopupWildfireIdRef.current = null
       map.remove()
       mapRef.current = null
     }
@@ -247,6 +262,35 @@ export function WildfireMap({
     const source = map.getSource(sourceId) as GeoJSONSource | undefined
     source?.setData(toGeoJson(wildfires))
   }, [wildfires])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map?.isStyleLoaded()) {
+      return
+    }
+
+    selectedWildfireRef.current = selectedWildfire
+
+    if (
+      activePopupWildfireIdRef.current &&
+      activePopupWildfireIdRef.current !== selectedWildfire?.id
+    ) {
+      activePopupRef.current?.remove()
+    }
+
+    const selectedId = selectedWildfire?.id ?? noSelectionId
+    map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
+
+    if (!selectedWildfire) {
+      return
+    }
+
+    map.flyTo({
+      center: [selectedWildfire.longitude, selectedWildfire.latitude],
+      zoom: Math.max(map.getZoom(), 6),
+      essential: true,
+    })
+  }, [selectedWildfire])
 
   return (
     <div
