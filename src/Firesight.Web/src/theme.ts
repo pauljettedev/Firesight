@@ -69,6 +69,13 @@ export const firesightTheme = createTheme({
         },
       },
     },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
     MuiAlert: {
       styleOverrides: {
         root: {
