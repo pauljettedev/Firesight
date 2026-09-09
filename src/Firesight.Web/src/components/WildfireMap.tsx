@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import * as maplibregl from 'maplibre-gl'
 import type {
@@ -67,6 +68,7 @@ export function WildfireMap({
   const onWildfireSelectRef = useRef(onWildfireSelect)
   const activePopupRef = useRef<maplibregl.Popup | null>(null)
   const activePopupWildfireIdRef = useRef<string | null>(null)
+  const mapSelectedWildfireIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     wildfiresRef.current = wildfires
@@ -183,22 +185,25 @@ export function WildfireMap({
 
         activePopupRef.current?.remove()
         map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
+        mapSelectedWildfireIdRef.current = selectedId
         onWildfireSelectRef.current?.(selected)
 
         const popupContent = document.createElement('div')
         const popupRoot = createRoot(popupContent)
 
-        popupRoot.render(
-          <WildfirePopup
-            name={String(properties.name ?? 'Wildfire')}
-            agency={String(properties.agency ?? 'Unknown agency')}
-            status={String(properties.status ?? '')}
-            areaHectares={toNullableNumber(properties.areaHectares)}
-            statusDateUtc={toNullableString(properties.statusDateUtc)}
-            lastSeenInFeedUtc={toNullableString(properties.lastSeenInFeedUtc)}
-            isStale={toBoolean(properties.isStale)}
-          />,
-        )
+        flushSync(() => {
+          popupRoot.render(
+            <WildfirePopup
+              name={String(properties.name ?? 'Wildfire')}
+              agency={String(properties.agency ?? 'Unknown agency')}
+              status={String(properties.status ?? '')}
+              areaHectares={toNullableNumber(properties.areaHectares)}
+              statusDateUtc={toNullableString(properties.statusDateUtc)}
+              lastSeenInFeedUtc={toNullableString(properties.lastSeenInFeedUtc)}
+              isStale={toBoolean(properties.isStale)}
+            />,
+          )
+        })
 
         const popup = new maplibregl.Popup({
           className: 'firesight-popup',
@@ -248,6 +253,7 @@ export function WildfireMap({
       activePopupRef.current?.remove()
       activePopupRef.current = null
       activePopupWildfireIdRef.current = null
+      mapSelectedWildfireIdRef.current = null
       map.remove()
       mapRef.current = null
     }
@@ -269,8 +275,6 @@ export function WildfireMap({
       return
     }
 
-    selectedWildfireRef.current = selectedWildfire
-
     if (
       activePopupWildfireIdRef.current &&
       activePopupWildfireIdRef.current !== selectedWildfire?.id
@@ -282,6 +286,12 @@ export function WildfireMap({
     map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
 
     if (!selectedWildfire) {
+      mapSelectedWildfireIdRef.current = null
+      return
+    }
+
+    if (mapSelectedWildfireIdRef.current === selectedWildfire.id) {
+      mapSelectedWildfireIdRef.current = null
       return
     }
 
