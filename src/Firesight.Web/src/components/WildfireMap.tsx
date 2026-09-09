@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as maplibregl from 'maplibre-gl'
-import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
+import type {
+  ExpressionSpecification,
+  GeoJSONSource,
+  Map as MapLibreMap,
+} from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './WildfireMap.css'
 import type { Wildfire } from '../services/wildfireService'
@@ -40,7 +44,7 @@ function toGeoJson(wildfires: Wildfire[]) {
   }
 }
 
-const circleRadius = [
+const circleRadius: ExpressionSpecification = [
   'interpolate',
   ['linear'],
   ['coalesce', ['get', 'areaHectares'], 0],
@@ -48,7 +52,7 @@ const circleRadius = [
   1000, 7,
   10000, 10,
   100000, 14,
-] as const
+]
 
 export function WildfireMap({
   wildfires,

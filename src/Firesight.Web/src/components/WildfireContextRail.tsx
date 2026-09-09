@@ -18,19 +18,11 @@ import {
 interface WildfireContextRailProps {
   selectedWildfire: Wildfire | null
   recentWildfires: Wildfire[]
-  lastSuccessfulSync: string
-  apiStatus: string
-  databaseStatus: string
-  staleCount: number
 }
 
 export function WildfireContextRail({
   selectedWildfire,
   recentWildfires,
-  lastSuccessfulSync,
-  apiStatus,
-  databaseStatus,
-  staleCount,
 }: WildfireContextRailProps) {
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden', minWidth: 0 }}>
@@ -40,39 +32,6 @@ export function WildfireContextRail({
         ) : (
           <RecentlyUpdated wildfires={recentWildfires} />
         )}
-      </Box>
-
-      <Divider />
-
-      <Box sx={{ p: 2.25 }}>
-        <Typography
-          variant="overline"
-          color="text.secondary"
-          sx={{ letterSpacing: '0.1em' }}
-        >
-          Data status
-        </Typography>
-
-        <Stack spacing={1.75} sx={{ mt: 1 }}>
-          <InfoItem label="Source" value="CWFIS" />
-          <InfoItem label="Last successful update" value={lastSuccessfulSync} />
-
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 1.5,
-            }}
-          >
-            <InfoItem label="API" value={apiStatus} />
-            <InfoItem label="Database" value={databaseStatus} />
-          </Box>
-
-          <InfoItem
-            label="Stale observations"
-            value={staleCount.toLocaleString()}
-          />
-        </Stack>
       </Box>
     </Paper>
   )

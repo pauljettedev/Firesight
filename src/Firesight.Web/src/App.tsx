@@ -13,32 +13,18 @@ import { DemoNotice } from './components/DemoNotice'
 import { ObservationFreshnessChart } from './components/ObservationFreshnessChart'
 import { WildfireContextRail } from './components/WildfireContextRail'
 import { WildfireMap } from './components/WildfireMap'
-import { getHealth, type HealthStatus } from './services/healthService'
 import {
   getWildfires,
-  getWildfireSyncState,
   type Wildfire,
-  type WildfireFeedSyncState,
 } from './services/wildfireService'
 
 function App() {
-  const [health, setHealth] = useState<HealthStatus | null>(null)
-  const [healthUnavailable, setHealthUnavailable] = useState(false)
   const [wildfires, setWildfires] = useState<Wildfire[]>([])
-  const [syncState, setSyncState] = useState<WildfireFeedSyncState | null>(null)
   const [selectedWildfire, setSelectedWildfire] = useState<Wildfire | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getHealth()
-      .then(setHealth)
-      .catch(() => setHealthUnavailable(true))
-
-    getWildfireSyncState()
-      .then(setSyncState)
-      .catch(() => setSyncState(null))
-
     getWildfires()
       .then(setWildfires)
       .catch((err: unknown) => {
@@ -46,10 +32,6 @@ function App() {
       })
       .finally(() => setLoading(false))
   }, [])
-
-  const lastSuccessfulSync = syncState?.lastSuccessfulFetchUtc
-    ? new Date(syncState.lastSuccessfulFetchUtc).toLocaleString()
-    : 'Not available'
 
   const statusCounts = wildfires.reduce(
     (counts, wildfire) => {
@@ -64,8 +46,6 @@ function App() {
     { outOfControl: 0, beingHeld: 0, underControl: 0 },
   )
 
-  const staleCount = wildfires.filter((wildfire) => wildfire.isStale).length
-
   const recentWildfires = useMemo(
     () =>
       [...wildfires]
@@ -76,18 +56,6 @@ function App() {
         .slice(0, 5),
     [wildfires],
   )
-
-  const apiStatus = health
-    ? health.status
-    : healthUnavailable
-      ? 'Unavailable'
-      : 'Checking…'
-
-  const databaseStatus = health
-    ? health.database
-    : healthUnavailable
-      ? 'Unavailable'
-      : 'Checking…'
 
   return (
     <Box sx={{ minHeight: '100vh' }}>
@@ -184,10 +152,6 @@ function App() {
               <WildfireContextRail
                 selectedWildfire={selectedWildfire}
                 recentWildfires={recentWildfires}
-                lastSuccessfulSync={lastSuccessfulSync}
-                apiStatus={apiStatus}
-                databaseStatus={databaseStatus}
-                staleCount={staleCount}
               />
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>
