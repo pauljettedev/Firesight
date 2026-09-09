@@ -1,17 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
-  AppBar,
   Box,
   CircularProgress,
   Container,
-  Divider,
-  Link,
   Paper,
   Stack,
-  Toolbar,
   Typography,
 } from '@mui/material'
+import { AppHeader } from './components/AppHeader'
+import { DemoNotice } from './components/DemoNotice'
+import { WildfireContextRail } from './components/WildfireContextRail'
 import { WildfireMap } from './components/WildfireMap'
 import { getHealth, type HealthStatus } from './services/healthService'
 import {
@@ -26,6 +25,7 @@ function App() {
   const [healthUnavailable, setHealthUnavailable] = useState(false)
   const [wildfires, setWildfires] = useState<Wildfire[]>([])
   const [syncState, setSyncState] = useState<WildfireFeedSyncState | null>(null)
+  const [selectedWildfire, setSelectedWildfire] = useState<Wildfire | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,60 +65,60 @@ function App() {
 
   const staleCount = wildfires.filter((wildfire) => wildfire.isStale).length
 
+  const recentWildfires = useMemo(
+    () =>
+      [...wildfires]
+        .sort(
+          (left, right) =>
+            wildfireUpdateTime(right) - wildfireUpdateTime(left),
+        )
+        .slice(0, 5),
+    [wildfires],
+  )
+
+  const apiStatus = health
+    ? health.status
+    : healthUnavailable
+      ? 'Unavailable'
+      : 'Checking…'
+
+  const databaseStatus = health
+    ? health.database
+    : healthUnavailable
+      ? 'Unavailable'
+      : 'Checking…'
+
   return (
     <Box sx={{ minHeight: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar sx={{ minHeight: 64 }}>
-          <Box>
-            <Typography
-              variant="h6"
-              component="h1"
-              sx={{ lineHeight: 1.1, textTransform: 'uppercase' }}
-            >
-              Firesight
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ letterSpacing: '0.08em', textTransform: 'uppercase' }}
-            >
-              Canadian wildfire situational awareness
-            </Typography>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <AppHeader />
 
       <Container
         maxWidth={false}
         sx={{
           px: { xs: 2, md: 2.5 },
-          py: { xs: 2, md: 3 },
+          py: { xs: 2, md: 2.25 },
         }}
       >
         <Stack spacing={2}>
-          <Alert
-            severity="warning"
-            variant="outlined"
+          <Box
             sx={{
-              color: 'text.secondary',
-              '& .MuiAlert-icon': { color: 'warning.main' },
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: { xs: 'flex-start', md: 'center' },
+              justifyContent: 'space-between',
+              gap: 1.25,
             }}
           >
-            Demo only. CWFIS data is provided for situational awareness and may not reflect
-            the most current fire situation. For operational decisions, consult the official{' '}
-            <Link href="https://cwfis.cfs.nrcan.gc.ca/" target="_blank" rel="noreferrer">
-              Canadian Wildland Fire Information System
-            </Link>{' '}
-            and the responsible provincial or territorial agency.
-          </Alert>
+            <Box sx={{ flex: '0 0 auto' }}>
+              <Typography variant="h5" component="h2">
+                Active wildfires in Canada
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Current and recently observed wildfire records from CWFIS
+              </Typography>
+            </Box>
 
-          <Box>
-            <Typography variant="h5" component="h2">
-              Active wildfires in Canada
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Current and recently observed wildfire records from CWFIS
-            </Typography>
+            <DemoNotice />
           </Box>
 
           <Paper
@@ -174,63 +174,20 @@ function App() {
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: '1fr',
-                  lg: '280px minmax(0, 1fr)',
+                  lg: '300px minmax(0, 1fr)',
                 },
                 gap: 2,
                 alignItems: 'stretch',
               }}
             >
-              <Paper variant="outlined" sx={{ p: 2.25 }}>
-                <Typography
-                  variant="overline"
-                  color="text.secondary"
-                  sx={{ letterSpacing: '0.1em' }}
-                >
-                  Data status
-                </Typography>
-
-                <Stack spacing={2} sx={{ mt: 1 }}>
-                  <StatusItem label="Source" value="CWFIS" />
-
-                  <Divider />
-
-                  <StatusItem
-                    label="Last successful update"
-                    value={lastSuccessfulSync}
-                  />
-
-                  <Divider />
-
-                  <StatusItem
-                    label="API"
-                    value={
-                      health
-                        ? health.status
-                        : healthUnavailable
-                          ? 'Unavailable'
-                          : 'Checking…'
-                    }
-                  />
-
-                  <StatusItem
-                    label="Database"
-                    value={
-                      health
-                        ? health.database
-                        : healthUnavailable
-                          ? 'Unavailable'
-                          : 'Checking…'
-                    }
-                  />
-
-                  <Divider />
-
-                  <StatusItem
-                    label="Stale observations"
-                    value={staleCount.toLocaleString()}
-                  />
-                </Stack>
-              </Paper>
+              <WildfireContextRail
+                selectedWildfire={selectedWildfire}
+                recentWildfires={recentWildfires}
+                lastSuccessfulSync={lastSuccessfulSync}
+                apiStatus={apiStatus}
+                databaseStatus={databaseStatus}
+                staleCount={staleCount}
+              />
 
               <Paper
                 variant="outlined"
@@ -242,7 +199,10 @@ function App() {
                   },
                 }}
               >
-                <WildfireMap wildfires={wildfires} />
+                <WildfireMap
+                  wildfires={wildfires}
+                  onWildfireSelect={setSelectedWildfire}
+                />
               </Paper>
             </Box>
           )}
@@ -298,33 +258,11 @@ function SummaryMetric({
   )
 }
 
-interface StatusItemProps {
-  label: string
-  value: string
-}
+function wildfireUpdateTime(wildfire: Wildfire): number {
+  const value = wildfire.statusDateUtc ?? wildfire.lastSeenInFeedUtc
+  const timestamp = Date.parse(value)
 
-function StatusItem({ label, value }: StatusItemProps) {
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          mt: 0.25,
-          fontWeight: 600,
-          overflowWrap: 'anywhere',
-        }}
-      >
-        {value}
-      </Typography>
-    </Box>
-  )
+  return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
 export default App

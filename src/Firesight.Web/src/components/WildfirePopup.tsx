@@ -1,4 +1,9 @@
 import './WildfirePopup.css'
+import {
+  formatArea,
+  formatTimestamp,
+  stageOfControlLabel,
+} from '../utils/wildfirePresentation'
 
 interface WildfirePopupProps {
   name: string
@@ -36,22 +41,9 @@ export function WildfirePopup({
 
       <dl className="wildfire-popup-details">
         <Detail label="Agency" value={agency} />
-        <Detail
-          label="Area"
-          value={
-            areaHectares != null
-              ? `${areaHectares.toLocaleString()} ha`
-              : 'Unavailable'
-          }
-        />
-        <Detail
-          label="Last seen"
-          value={formatTimestamp(lastSeenInFeedUtc)}
-        />
-        <Detail
-          label="Status date"
-          value={formatTimestamp(statusDateUtc)}
-        />
+        <Detail label="Area" value={formatArea(areaHectares)} />
+        <Detail label="Last seen" value={formatTimestamp(lastSeenInFeedUtc)} />
+        <Detail label="Status date" value={formatTimestamp(statusDateUtc)} />
       </dl>
 
       <div
@@ -65,28 +57,13 @@ export function WildfirePopup({
   )
 }
 
-interface DetailProps {
-  label: string
-  value: string
-}
-
-function Detail({ label, value }: DetailProps) {
+function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="wildfire-popup-detail">
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
   )
-}
-
-function stageOfControlLabel(code: string): string {
-  switch (code.toUpperCase()) {
-    case 'OC': return 'Out of Control'
-    case 'BH': return 'Being Held'
-    case 'UC': return 'Under Control'
-    case 'EX': return 'Extinguished'
-    default: return code || 'Unknown status'
-  }
 }
 
 function statusToneClass(code: string): string {
@@ -97,17 +74,4 @@ function statusToneClass(code: string): string {
     case 'EX': return 'status-extinguished'
     default: return 'status-unknown'
   }
-}
-
-function formatTimestamp(value: string | null): string {
-  if (!value) {
-    return 'Not provided'
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return 'Invalid timestamp'
-  }
-
-  return date.toLocaleString()
 }

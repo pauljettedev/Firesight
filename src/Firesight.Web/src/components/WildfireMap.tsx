@@ -9,6 +9,7 @@ import { WildfirePopup } from './WildfirePopup'
 
 interface WildfireMapProps {
   wildfires: Wildfire[]
+  onWildfireSelect?: (wildfire: Wildfire | null) => void
 }
 
 const sourceId = 'wildfires'
@@ -49,14 +50,22 @@ const circleRadius = [
   100000, 14,
 ] as const
 
-export function WildfireMap({ wildfires }: WildfireMapProps) {
+export function WildfireMap({
+  wildfires,
+  onWildfireSelect,
+}: WildfireMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const wildfiresRef = useRef(wildfires)
+  const onWildfireSelectRef = useRef(onWildfireSelect)
 
   useEffect(() => {
     wildfiresRef.current = wildfires
   }, [wildfires])
+
+  useEffect(() => {
+    onWildfireSelectRef.current = onWildfireSelect
+  }, [onWildfireSelect])
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -140,11 +149,7 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
         source: sourceId,
         filter: ['==', ['get', 'id'], noSelectionId],
         paint: {
-          'circle-radius': [
-            '+',
-            circleRadius,
-            4,
-          ],
+          'circle-radius': ['+', circleRadius, 4],
           'circle-color': 'rgba(0, 0, 0, 0)',
           'circle-stroke-color': '#41d9e8',
           'circle-stroke-width': 3,
@@ -161,9 +166,12 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
         const coordinates = [...feature.geometry.coordinates] as [number, number]
         const properties = feature.properties ?? {}
         const selectedId = String(properties.id ?? noSelectionId)
+        const selectedWildfire =
+          wildfiresRef.current.find((wildfire) => wildfire.id === selectedId) ?? null
 
         activePopup?.remove()
         map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
+        onWildfireSelectRef.current?.(selectedWildfire)
 
         const popupContent = document.createElement('div')
         const popupRoot = createRoot(popupContent)
@@ -204,6 +212,7 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
             ['get', 'id'],
             noSelectionId,
           ])
+          onWildfireSelectRef.current?.(null)
         })
       })
 
@@ -245,19 +254,13 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
 }
 
 function toNullableNumber(value: unknown): number | null {
-  if (value == null) {
-    return null
-  }
-
+  if (value == null) return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
 }
 
 function toNullableString(value: unknown): string | null {
-  if (value == null || value === '') {
-    return null
-  }
-
+  if (value == null || value === '') return null
   return String(value)
 }
 
