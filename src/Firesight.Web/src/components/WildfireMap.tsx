@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Wildfire } from '../services/wildfireService'
 
@@ -19,14 +20,14 @@ const stageOfControlLabel = (code: unknown): string => {
   }
 }
 
-function toGeoJson(wildfires: Wildfire[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+function toGeoJson(wildfires: Wildfire[]) {
   return {
-    type: 'FeatureCollection',
+    type: 'FeatureCollection' as const,
     features: wildfires.map((fire) => ({
-      type: 'Feature',
+      type: 'Feature' as const,
       geometry: {
-        type: 'Point',
-        coordinates: [fire.longitude, fire.latitude],
+        type: 'Point' as const,
+        coordinates: [fire.longitude, fire.latitude] as [number, number],
       },
       properties: {
         id: fire.id,
@@ -45,6 +46,11 @@ function toGeoJson(wildfires: Wildfire[]): GeoJSON.FeatureCollection<GeoJSON.Poi
 export function WildfireMap({ wildfires }: WildfireMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
+  const wildfiresRef = useRef(wildfires)
+
+  useEffect(() => {
+    wildfiresRef.current = wildfires
+  }, [wildfires])
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -80,7 +86,7 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
     map.on('load', () => {
       map.addSource(sourceId, {
         type: 'geojson',
-        data: toGeoJson(wildfires),
+        data: toGeoJson(wildfiresRef.current),
       })
 
       map.addLayer({

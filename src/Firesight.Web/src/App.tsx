@@ -49,18 +49,38 @@ function App() {
     : 'Not available'
 
   return (
-    <Box>
+    <Box sx={{ minHeight: '100vh' }}>
       <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="h1">
-            Firesight AI
-          </Typography>
+        <Toolbar sx={{ minHeight: 64 }}>
+          <Box>
+            <Typography
+              variant="h6"
+              component="h1"
+              sx={{ lineHeight: 1.1, textTransform: 'uppercase' }}
+            >
+              Firesight
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ letterSpacing: '0.08em', textTransform: 'uppercase' }}
+            >
+              Canadian wildfire situational awareness
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Stack spacing={2}>
-          <Alert severity="warning">
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+        <Stack spacing={2.5}>
+          <Alert
+            severity="warning"
+            variant="outlined"
+            sx={{
+              color: 'text.secondary',
+              '& .MuiAlert-icon': { color: 'warning.main' },
+            }}
+          >
             Demo only. CWFIS data is provided for situational awareness and may not reflect
             the most current fire situation. For operational decisions, consult the official{' '}
             <Link href="https://cwfis.cfs.nrcan.gc.ca/" target="_blank" rel="noreferrer">
