@@ -1,0 +1,91 @@
+.firesight-map {
+  background: #0d141b;
+}
+
+.firesight-map .maplibregl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid rgba(143, 164, 179, 0.28);
+  border-radius: 6px;
+  background: #121c25;
+  box-shadow: none;
+}
+
+.firesight-map .maplibregl-ctrl-group button {
+  background-color: #121c25;
+}
+
+.firesight-map .maplibregl-ctrl-group button + button {
+  border-top-color: rgba(143, 164, 179, 0.18);
+}
+
+.firesight-map .maplibregl-ctrl-group button:not(:disabled):hover,
+.firesight-map .maplibregl-ctrl-group button:not(:disabled):active {
+  background-color: #1a2834;
+}
+
+.firesight-map .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.25);
+  opacity: 0.82;
+}
+
+.firesight-map .maplibregl-ctrl-attrib {
+  color: #8fa4b3;
+  background: rgba(13, 20, 27, 0.88);
+}
+
+.firesight-map .maplibregl-ctrl-attrib a {
+  color: #41d9e8;
+}
+
+.firesight-popup .maplibregl-popup-content {
+  min-width: 260px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(143, 164, 179, 0.28);
+  border-radius: 6px;
+  color: #eef4f7;
+  background: #121c25;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.36);
+}
+
+.firesight-popup .maplibregl-popup-close-button {
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: #8fa4b3;
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.firesight-popup .maplibregl-popup-close-button:hover {
+  color: #eef4f7;
+  background: rgba(143, 164, 179, 0.12);
+}
+
+.firesight-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: #121c25;
+}
+
+.firesight-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: #121c25;
+}
+
+.firesight-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: #121c25;
+}
+
+.firesight-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: #121c25;
+}
+
+.firesight-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.firesight-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: #121c25;
+}
+
+.firesight-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.firesight-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: #121c25;
+}

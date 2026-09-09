@@ -1,24 +1,20 @@
 import { useEffect, useRef } from 'react'
+import { createRoot } from 'react-dom/client'
 import * as maplibregl from 'maplibre-gl'
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import './WildfireMap.css'
 import type { Wildfire } from '../services/wildfireService'
+import { WildfirePopup } from './WildfirePopup'
 
 interface WildfireMapProps {
   wildfires: Wildfire[]
 }
 
 const sourceId = 'wildfires'
-
-const stageOfControlLabel = (code: unknown): string => {
-  switch (String(code ?? '').toUpperCase()) {
-    case 'OC': return 'Out of Control'
-    case 'BH': return 'Being Held'
-    case 'UC': return 'Under Control'
-    case 'EX': return 'Extinguished'
-    default: return String(code || 'Unknown status')
-  }
-}
+const pointsLayerId = 'wildfire-points'
+const selectionLayerId = 'wildfire-selection'
+const noSelectionId = '__no_selection__'
 
 function toGeoJson(wildfires: Wildfire[]) {
   return {
@@ -43,6 +39,16 @@ function toGeoJson(wildfires: Wildfire[]) {
   }
 }
 
+const circleRadius = [
+  'interpolate',
+  ['linear'],
+  ['coalesce', ['get', 'areaHectares'], 0],
+  0, 5,
+  1000, 7,
+  10000, 10,
+  100000, 14,
+] as const
+
 export function WildfireMap({ wildfires }: WildfireMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -56,6 +62,8 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
     if (!containerRef.current || mapRef.current) {
       return
     }
+
+    let activePopup: maplibregl.Popup | null = null
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -76,6 +84,12 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
             id: 'osm',
             type: 'raster',
             source: 'osm',
+            paint: {
+              'raster-saturation': -0.72,
+              'raster-contrast': 0.16,
+              'raster-brightness-min': 0.08,
+              'raster-brightness-max': 0.58,
+            },
           },
         ],
       },
@@ -90,45 +104,55 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
       })
 
       map.addLayer({
-        id: 'wildfire-points',
+        id: pointsLayerId,
         type: 'circle',
         source: sourceId,
         paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['coalesce', ['get', 'areaHectares'], 0],
-            0, 5,
-            1000, 7,
-            10000, 10,
-            100000, 14,
-          ],
+          'circle-radius': circleRadius,
           'circle-color': [
             'match',
             ['get', 'status'],
-            'OC', '#d32f2f',
-            'BH', '#ed6c02',
-            'UC', '#2e7d32',
-            'EX', '#616161',
-            '#7b1fa2',
+            'OC', '#ef6a6a',
+            'BH', '#f0b45a',
+            'UC', '#69c58f',
+            'EX', '#8796a1',
+            '#8e78b5',
           ],
-          'circle-stroke-color': '#ffffff',
+          'circle-stroke-color': '#eef4f7',
           'circle-stroke-width': [
             'case',
             ['==', ['get', 'isStale'], true],
-            3,
+            2,
             1,
           ],
           'circle-opacity': [
             'case',
             ['==', ['get', 'isStale'], true],
-            0.45,
-            0.85,
+            0.48,
+            0.88,
           ],
         },
       })
 
-      map.on('click', 'wildfire-points', (event) => {
+      map.addLayer({
+        id: selectionLayerId,
+        type: 'circle',
+        source: sourceId,
+        filter: ['==', ['get', 'id'], noSelectionId],
+        paint: {
+          'circle-radius': [
+            '+',
+            circleRadius,
+            4,
+          ],
+          'circle-color': 'rgba(0, 0, 0, 0)',
+          'circle-stroke-color': '#41d9e8',
+          'circle-stroke-width': 3,
+          'circle-opacity': 1,
+        },
+      })
+
+      map.on('click', pointsLayerId, (event) => {
         const feature = event.features?.[0]
         if (!feature || feature.geometry.type !== 'Point') {
           return
@@ -136,32 +160,58 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
 
         const coordinates = [...feature.geometry.coordinates] as [number, number]
         const properties = feature.properties ?? {}
-        const area = properties.areaHectares != null
-          ? `${Number(properties.areaHectares).toLocaleString()} ha`
-          : 'Area unavailable'
-        const statusDate = formatTimestamp(properties.statusDateUtc)
-        const lastSeen = formatTimestamp(properties.lastSeenInFeedUtc)
-        const freshness = properties.isStale ? 'Stale observation' : 'Recent observation'
+        const selectedId = String(properties.id ?? noSelectionId)
 
-        new maplibregl.Popup()
+        activePopup?.remove()
+        map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
+
+        const popupContent = document.createElement('div')
+        const popupRoot = createRoot(popupContent)
+
+        popupRoot.render(
+          <WildfirePopup
+            name={String(properties.name ?? 'Wildfire')}
+            agency={String(properties.agency ?? 'Unknown agency')}
+            status={String(properties.status ?? '')}
+            areaHectares={toNullableNumber(properties.areaHectares)}
+            statusDateUtc={toNullableString(properties.statusDateUtc)}
+            lastSeenInFeedUtc={toNullableString(properties.lastSeenInFeedUtc)}
+            isStale={toBoolean(properties.isStale)}
+          />,
+        )
+
+        const popup = new maplibregl.Popup({
+          className: 'firesight-popup',
+          offset: 14,
+          maxWidth: '320px',
+        })
           .setLngLat(coordinates)
-          .setHTML(
-            `<strong>${escapeHtml(String(properties.name ?? 'Wildfire'))}</strong><br />` +
-            `${escapeHtml(String(properties.agency ?? 'Unknown agency'))}<br />` +
-            `${escapeHtml(stageOfControlLabel(properties.status))}<br />` +
-            `${escapeHtml(area)}<br />` +
-            `Last seen in feed: ${escapeHtml(lastSeen)}<br />` +
-            `Freshness: ${escapeHtml(freshness)}<br />` +
-            `Status date: ${escapeHtml(statusDate)}`,
-          )
+          .setDOMContent(popupContent)
           .addTo(map)
+
+        activePopup = popup
+
+        popup.on('close', () => {
+          popupRoot.unmount()
+
+          if (activePopup !== popup) {
+            return
+          }
+
+          activePopup = null
+          map.setFilter(selectionLayerId, [
+            '==',
+            ['get', 'id'],
+            noSelectionId,
+          ])
+        })
       })
 
-      map.on('mouseenter', 'wildfire-points', () => {
+      map.on('mouseenter', pointsLayerId, () => {
         map.getCanvas().style.cursor = 'pointer'
       })
 
-      map.on('mouseleave', 'wildfire-points', () => {
+      map.on('mouseleave', pointsLayerId, () => {
         map.getCanvas().style.cursor = ''
       })
     })
@@ -169,6 +219,7 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
     mapRef.current = map
 
     return () => {
+      activePopup?.remove()
       map.remove()
       mapRef.current = null
     }
@@ -184,32 +235,32 @@ export function WildfireMap({ wildfires }: WildfireMapProps) {
     source?.setData(toGeoJson(wildfires))
   }, [wildfires])
 
-  return <div ref={containerRef} style={{ height: '65vh', minHeight: 480, width: '100%' }} />
+  return (
+    <div
+      ref={containerRef}
+      className="firesight-map"
+      style={{ height: '65vh', minHeight: 480, width: '100%' }}
+    />
+  )
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (character) => {
-    const entities: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;',
-    }
+function toNullableNumber(value: unknown): number | null {
+  if (value == null) {
+    return null
+  }
 
-    return entities[character]
-  })
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
-function formatTimestamp(value: unknown): string {
-  if (!value) {
-    return 'Not provided'
+function toNullableString(value: unknown): string | null {
+  if (value == null || value === '') {
+    return null
   }
 
-  const date = new Date(String(value))
-  if (Number.isNaN(date.getTime())) {
-    return 'Invalid timestamp'
-  }
+  return String(value)
+}
 
-  return date.toLocaleString()
+function toBoolean(value: unknown): boolean {
+  return value === true || value === 'true'
 }
