@@ -1,8 +1,10 @@
+using Firesight.Application.AskFiresight;
 using Firesight.Application.Locations;
 using Firesight.Application.Wildfires;
 using Firesight.Infrastructure.Cwfis;
 using Firesight.Infrastructure.HostedServices;
 using Firesight.Infrastructure.Nominatim;
+using Firesight.Infrastructure.OpenAI;
 using Firesight.Infrastructure.Persistence;
 using Firesight.Infrastructure.Wildfires;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +53,13 @@ public static class DependencyInjection
                 "Nominatim:BaseUrl must be a valid absolute HTTP or HTTPS URL.")
             .ValidateOnStart();
 
+        services.AddOptions<OpenAiOptions>()
+            .Bind(configuration.GetSection(OpenAiOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.Model),
+                "OpenAI:Model is required.")
+            .ValidateOnStart();
+
         services.AddOptions<WildfireRetentionOptions>()
             .Bind(configuration.GetSection(WildfireRetentionOptions.SectionName))
             .Validate(
@@ -85,6 +94,7 @@ public static class DependencyInjection
                     new Uri("https://github.com/pauljettedev/Firesight");
             });
 
+        services.AddScoped<IAskFiresightService, OpenAiAskFiresightService>();
         services.AddScoped<IWildfireRepository, WildfireRepository>();
         services.AddScoped<IWildfireSyncStateRepository, WildfireSyncStateRepository>();
         services.AddScoped<DatabaseInitializer>();
