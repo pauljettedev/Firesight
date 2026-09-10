@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material'
 import { AppHeader } from './components/AppHeader'
+import { AskFiresightPanel } from './components/AskFiresightPanel'
 import { ObservationFreshnessChart } from './components/ObservationFreshnessChart'
 import { WildfireContextRail } from './components/WildfireContextRail'
 import { WildfireMap } from './components/WildfireMap'
@@ -103,6 +104,8 @@ function App() {
               divider
             />
           </Paper>
+
+          <AskFiresightPanel />
 
           {loading && (
             <Paper
