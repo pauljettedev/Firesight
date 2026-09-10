@@ -140,20 +140,13 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
     private readonly ILocationGeocoder locationGeocoder;
 
     public OpenAiAskFiresightService(
+        ResponsesClient client,
         IOptions<OpenAiOptions> options,
         IWildfireService wildfireService,
         ILocationGeocoder locationGeocoder)
     {
-        var configuredOptions = options.Value;
-
-        if (string.IsNullOrWhiteSpace(configuredOptions.ApiKey))
-        {
-            throw new InvalidOperationException(
-                "OpenAI:ApiKey is required to use Ask Firesight.");
-        }
-
-        client = new ResponsesClient(apiKey: configuredOptions.ApiKey);
-        model = configuredOptions.Model;
+        this.client = client;
+        model = options.Value.Model;
         this.wildfireService = wildfireService;
         this.locationGeocoder = locationGeocoder;
     }

@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenAI.Responses;
 
 namespace Firesight.Infrastructure;
 
@@ -93,6 +94,23 @@ public static class DependencyInjection
                 client.DefaultRequestHeaders.Referrer =
                     new Uri("https://github.com/pauljettedev/Firesight");
             });
+
+#pragma warning disable OPENAI001
+        services.AddScoped(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<OpenAiOptions>>()
+                .Value;
+
+            if (string.IsNullOrWhiteSpace(options.ApiKey))
+            {
+                throw new InvalidOperationException(
+                    "OpenAI:ApiKey is required to use Ask Firesight.");
+            }
+
+            return new ResponsesClient(apiKey: options.ApiKey);
+        });
+#pragma warning restore OPENAI001
 
         services.AddScoped<IAskFiresightService, OpenAiAskFiresightService>();
         services.AddScoped<IWildfireRepository, WildfireRepository>();
