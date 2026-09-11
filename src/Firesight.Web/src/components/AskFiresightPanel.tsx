@@ -5,7 +5,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -28,7 +27,7 @@ const toolLabels: Record<string, string> = {
   geocode_location: 'Location lookup',
   get_active_wildfires: 'Current wildfire data',
   get_wildfire_by_external_id: 'Wildfire record',
-  find_wildfires_near_location: 'Nearby wildfire search',
+  find_wildfires_near_location: 'Nearby search',
   get_feed_sync_state: 'Dataset freshness',
 }
 
@@ -105,103 +104,63 @@ export function AskFiresightPanel({
   }
 
   return (
-    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-      <Box
-        sx={{
-          px: { xs: 2, md: 2.5 },
-          py: 2,
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            lg: 'minmax(220px, 0.7fr) minmax(0, 2fr)',
-          },
-          gap: { xs: 2, lg: 3 },
-          alignItems: 'start',
-        }}
+    <Box>
+      <Typography
+        variant="overline"
+        color="primary.main"
+        sx={{ letterSpacing: '0.1em', fontWeight: 700 }}
       >
-        <Box>
-          <Typography
-            variant="overline"
-            color="primary.main"
-            sx={{ letterSpacing: '0.1em', fontWeight: 700 }}
+        Ask Firesight
+      </Typography>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+        Ask about the current wildfire dataset.
+      </Typography>
+
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1.5 }}>
+        <Stack spacing={1.25}>
+          <TextField
+            value={question}
+            onChange={(event) => handleQuestionChange(event.target.value)}
+            placeholder="Ask about fires, locations, sizes, or data freshness..."
+            multiline
+            minRows={3}
+            maxRows={6}
+            fullWidth
+            size="small"
+            disabled={loading}
+            slotProps={{
+              htmlInput: {
+                maxLength: MaxQuestionLength,
+                'aria-label': 'Ask Firesight question',
+              },
+            }}
+            helperText={`${question.length}/${MaxQuestionLength}`}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={!canSubmit}
+            fullWidth
           >
-            Ask Firesight
-          </Typography>
+            {loading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              'Ask Firesight'
+            )}
+          </Button>
 
-          <Typography variant="body2" sx={{ mt: 0.35, fontWeight: 600 }}>
-            Query the current Firesight wildfire dataset
-          </Typography>
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: 'block', mt: 0.75, lineHeight: 1.5 }}
-          >
-            Answers use Firesight&apos;s wildfire, location, and dataset
-            freshness tools. This is a demo, not an emergency information
-            service.
-          </Typography>
-        </Box>
-
-        <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={1.25}>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) auto' },
-                gap: 1,
-                alignItems: 'start',
-              }}
-            >
-              <TextField
-                value={question}
-                onChange={(event) => handleQuestionChange(event.target.value)}
-                placeholder="Ask about current wildfire conditions, locations, sizes, or data freshness..."
-                multiline
-                minRows={2}
-                maxRows={4}
-                fullWidth
-                size="small"
-                disabled={loading}
-                slotProps={{
-                  htmlInput: {
-                    maxLength: MaxQuestionLength,
-                    'aria-label': 'Ask Firesight question',
-                  },
-                }}
-                helperText={`${question.length}/${MaxQuestionLength}`}
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={!canSubmit}
-                sx={{
-                  minWidth: { sm: 116 },
-                  minHeight: 40,
-                  mt: { sm: 0 },
-                }}
+          {!result && !loading && (
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 0.25 }}
               >
-                {loading ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  'Ask'
-                )}
-              </Button>
-            </Box>
-
-            {!result && !loading && (
-              <Box
-                sx={{
-                  display: 'flex',
-                  gap: 0.75,
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Try:
-                </Typography>
+                Try:
+              </Typography>
+              <Stack spacing={0.25}>
                 {exampleQuestions.map((example) => (
                   <Button
                     key={example}
@@ -211,90 +170,95 @@ export function AskFiresightPanel({
                     onClick={() => selectExample(example)}
                     sx={{
                       minWidth: 0,
-                      px: 0.75,
+                      px: 0,
                       py: 0.25,
                       justifyContent: 'flex-start',
+                      textAlign: 'left',
                       textTransform: 'none',
                       fontSize: '0.75rem',
+                      lineHeight: 1.35,
                       color: 'text.secondary',
                     }}
                   >
                     {example}
                   </Button>
                 ))}
-              </Box>
-            )}
+              </Stack>
+            </Box>
+          )}
 
-            {error && <Alert severity="error">{error}</Alert>}
+          {error && <Alert severity="error">{error}</Alert>}
 
-            {result && (
-              <Box
+          {result && (
+            <Box
+              sx={{
+                borderTop: '1px solid',
+                borderColor: 'divider',
+                pt: 1.5,
+              }}
+            >
+              <Typography
+                variant="body2"
                 sx={{
-                  borderTop: '1px solid',
-                  borderColor: 'divider',
-                  pt: 1.5,
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.6,
+                  overflowWrap: 'anywhere',
                 }}
               >
-                <Typography
-                  variant="body2"
-                  sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}
-                >
-                  {result.answer}
-                </Typography>
+                {result.answer}
+              </Typography>
 
+              {result.mapContext && (
+                <Button
+                  type="button"
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                  disabled={mapLoading}
+                  onClick={() => void handleShowOnMap(result.mapContext!)}
+                  sx={{ mt: 1.5, textTransform: 'none' }}
+                >
+                  {mapLoading ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    `Show ${formatRadius(result.mapContext.radiusKm)} area on map`
+                  )}
+                </Button>
+              )}
+
+              {result.toolsUsed.length > 0 && (
                 <Box
                   sx={{
                     mt: 1.5,
                     display: 'flex',
-                    gap: 0.75,
+                    gap: 0.5,
                     flexWrap: 'wrap',
-                    alignItems: 'center',
                   }}
                 >
-                  {result.toolsUsed.length > 0 && (
-                    <>
-                      <Typography variant="caption" color="text.secondary">
-                        Used Firesight data:
-                      </Typography>
-
-                      {result.toolsUsed.map((tool) => (
-                        <Chip
-                          key={tool}
-                          label={toolLabels[tool] ?? tool}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 24 }}
-                        />
-                      ))}
-                    </>
-                  )}
-
-                  {result.mapContext && (
-                    <Button
-                      type="button"
+                  {result.toolsUsed.map((tool) => (
+                    <Chip
+                      key={tool}
+                      label={toolLabels[tool] ?? tool}
                       size="small"
                       variant="outlined"
-                      disabled={mapLoading}
-                      onClick={() => void handleShowOnMap(result.mapContext!)}
                       sx={{
-                        ml: { sm: 'auto' },
-                        textTransform: 'none',
+                        height: 22,
+                        maxWidth: '100%',
+                        '& .MuiChip-label': {
+                          px: 0.75,
+                          fontSize: '0.68rem',
+                        },
                       }}
-                    >
-                      {mapLoading ? (
-                        <CircularProgress size={16} color="inherit" />
-                      ) : (
-                        `Show ${formatRadius(result.mapContext.radiusKm)} area on map`
-                      )}
-                    </Button>
-                  )}
+                    />
+                  ))}
                 </Box>
-              </Box>
-            )}
-          </Stack>
-        </Box>
+              )}
+
+            </Box>
+          )}
+        </Stack>
       </Box>
-    </Paper>
+    </Box>
   )
 }
 

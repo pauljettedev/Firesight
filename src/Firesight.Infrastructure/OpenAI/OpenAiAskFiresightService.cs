@@ -21,13 +21,34 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
         For questions about current wildfire conditions, use the supplied Firesight tools rather than guessing.
         Use geocode_location before find_wildfires_near_location when the user gives a place name instead of coordinates.
         If the user asks about fires near a place without specifying a distance, use a 200 km radius.
-        Treat tool output as the authoritative Firesight dataset for the answer.
+        For wildfire facts, Firesight tool output is the only authoritative source.
+        The underlying CWFIS/government feed represented by Firesight is the single source of truth for fire details.
+        Do not use prior model knowledge, inferred details, outside wildfire knowledge, or unstated assumptions to supplement,
+        reinterpret, correct, or override tool output. If a wildfire fact is not present in tool output, do not state it.
+        If tool data conflicts with prior knowledge, always use the tool data.
         Never invent wildfire records, identifiers, statuses, sizes, locations, timestamps, or distances.
-        Distinguish dataset synchronization freshness from the observation timestamps on individual wildfire records.
-        Use human-facing wildfire terminology rather than internal property names or raw field labels unless the user asks for raw data.
-        Firesight is a demo and not an emergency information service. When safety or evacuation decisions are involved,
-        tell the user to verify information with official wildfire and emergency authorities.
-        Answer clearly and concisely.
+
+        Answer only the question the user asked. Prefer a single short sentence when that fully answers it.
+        For count or yes/no questions, return the answer and count only. Do not list individual wildfire details,
+        coordinates, identifiers, sizes, timestamps, feed freshness, or dataset synchronization information unless
+        the user specifically asks for those details.
+        Do not add headings, summaries, generic disclaimers, follow-up questions, or offers to provide more information.
+        Use human-facing wildfire terminology rather than internal property names or raw field labels.
+        Interpret stage-of-control codes correctly: OC is Out of Control, BH is Being Held, UC is Under Control,
+        and EX is Extinguished.
+        Only discuss dataset synchronization freshness when the user asks about data freshness or synchronization.
+        For direct safety or evacuation questions, tell the user to verify conditions with official wildfire and
+        emergency authorities.
+
+        Encode simple factual intent in tool arguments instead of relying on prose interpretation after the tool runs.
+        For yes/no existence questions, use responseMode "exists".
+        For count questions, use responseMode "count".
+        For list, detail, comparison, ranking, or summary questions, use responseMode "records".
+        When the user asks for a specific stage of control, pass its CWFIS code in status:
+        OC = Out of Control, BH = Being Held, UC = Under Control, EX = Extinguished.
+        When no stage-of-control filter is requested, pass status as null.
+        For wildfire-by-identifier status questions, use responseMode "status"; otherwise use "record".
+        Firesight application code, not the model, determines counts, existence, and direct status answers from tool data.
         """;
 
     private static readonly JsonSerializerOptions JsonOptions =
@@ -58,13 +79,24 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
         ResponseTool.CreateFunctionTool(
             functionName: "get_active_wildfires",
             functionDescription:
-                "Return the current wildfire records available in Firesight.",
+                "Query current Firesight wildfire records. Use status and responseMode to express simple factual intent.",
             functionParameters: BinaryData.FromString(
                 """
                 {
                   "type": "object",
-                  "properties": {},
-                  "required": [],
+                  "properties": {
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": ["OC", "BH", "UC", "EX", null],
+                      "description": "Optional CWFIS stage-of-control filter. Use null when no status filter is requested."
+                    },
+                    "responseMode": {
+                      "type": "string",
+                      "enum": ["records", "count", "exists"],
+                      "description": "Use records for lists/summaries, count for numeric counts, and exists for yes/no existence questions."
+                    }
+                  },
+                  "required": ["status", "responseMode"],
                   "additionalProperties": false
                 }
                 """),
@@ -83,9 +115,14 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
                     "externalId": {
                       "type": "string",
                       "description": "CWFIS national fire identifier, for example 2026_ON_THU_FIRE_036."
+                    },
+                    "responseMode": {
+                      "type": "string",
+                      "enum": ["record", "status"],
+                      "description": "Use status for a direct stage-of-control question; otherwise use record."
                     }
                   },
-                  "required": ["externalId"],
+                  "required": ["externalId", "responseMode"],
                   "additionalProperties": false
                 }
                 """),
@@ -112,9 +149,19 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
                     "radiusKm": {
                       "type": "number",
                       "description": "Search radius in kilometres. Must be greater than zero."
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": ["OC", "BH", "UC", "EX", null],
+                      "description": "Optional CWFIS stage-of-control filter. Use null when no status filter is requested."
+                    },
+                    "responseMode": {
+                      "type": "string",
+                      "enum": ["records", "count", "exists"],
+                      "description": "Use records for lists/summaries, count for numeric counts, and exists for yes/no existence questions."
                     }
                   },
-                  "required": ["latitude", "longitude", "radiusKm"],
+                  "required": ["latitude", "longitude", "radiusKm", "status", "responseMode"],
                   "additionalProperties": false
                 }
                 """),
@@ -231,6 +278,16 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
                     mapContext = execution.MapContext;
                 }
 
+                var deterministicAnswer = TryCreateDeterministicAnswer(
+                    execution,
+                    toolsUsed,
+                    mapContext);
+
+                if (deterministicAnswer is not null)
+                {
+                    return deterministicAnswer;
+                }
+
                 inputItems.Add(
                     new FunctionCallOutputResponseItem(
                         functionCall.CallId,
@@ -269,21 +326,29 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
 
                 case "get_active_wildfires":
                 {
+                    var status = GetOptionalString(root, "status");
+                    var responseMode = root.GetProperty("responseMode").GetString()!;
                     var result = await wildfireService.GetActiveWildfiresAsync(
                         cancellationToken);
 
                     return new ToolExecutionResult(
-                        JsonSerializer.Serialize(result, JsonOptions));
+                        JsonSerializer.Serialize(result, JsonOptions),
+                        RequestedStatus: status,
+                        ResponseMode: responseMode,
+                        Wildfires: result);
                 }
 
                 case "get_wildfire_by_external_id":
                 {
+                    var responseMode = root.GetProperty("responseMode").GetString()!;
                     var result = await wildfireService.GetWildfireByExternalIdAsync(
                         root.GetProperty("externalId").GetString()!,
                         cancellationToken);
 
                     return new ToolExecutionResult(
-                        JsonSerializer.Serialize(result, JsonOptions));
+                        JsonSerializer.Serialize(result, JsonOptions),
+                        ResponseMode: responseMode,
+                        Wildfire: result);
                 }
 
                 case "find_wildfires_near_location":
@@ -291,6 +356,8 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
                     var latitude = root.GetProperty("latitude").GetDouble();
                     var longitude = root.GetProperty("longitude").GetDouble();
                     var radiusKm = root.GetProperty("radiusKm").GetDouble();
+                    var status = GetOptionalString(root, "status");
+                    var responseMode = root.GetProperty("responseMode").GetString()!;
 
                     var result = await wildfireService.FindWildfiresNearAsync(
                         latitude,
@@ -311,7 +378,10 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
                             latitude,
                             longitude,
                             radiusKm,
-                            label));
+                            label),
+                        RequestedStatus: status,
+                        ResponseMode: responseMode,
+                        NearbyWildfires: result);
                 }
 
                 case "get_feed_sync_state":
@@ -341,10 +411,136 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
         }
     }
 
+    private static AskFiresightResult? TryCreateDeterministicAnswer(
+        ToolExecutionResult execution,
+        IReadOnlyList<string> toolsUsed,
+        AskFiresightMapContext? mapContext)
+    {
+        if (execution.ResponseMode is "count" or "exists")
+        {
+            if (execution.NearbyWildfires is not null && mapContext is not null)
+            {
+                var count = CountByStatus(
+                    execution.NearbyWildfires.Select(item => item.Wildfire),
+                    execution.RequestedStatus);
+
+                return new AskFiresightResult(
+                    FormatCountAnswer(
+                        count,
+                        execution.RequestedStatus,
+                        execution.ResponseMode == "exists",
+                        mapContext),
+                    toolsUsed,
+                    mapContext);
+            }
+
+            if (execution.Wildfires is not null)
+            {
+                var count = CountByStatus(
+                    execution.Wildfires,
+                    execution.RequestedStatus);
+
+                return new AskFiresightResult(
+                    FormatCountAnswer(
+                        count,
+                        execution.RequestedStatus,
+                        execution.ResponseMode == "exists"),
+                    toolsUsed,
+                    mapContext);
+            }
+        }
+
+        if (execution.ResponseMode == "status" &&
+            execution.Wildfire is not null)
+        {
+            return new AskFiresightResult(
+                $"{execution.Wildfire.ExternalId} is {StageOfControlLabel(execution.Wildfire.Status)}.",
+                toolsUsed,
+                mapContext);
+        }
+
+        return null;
+    }
+
+    private static string? GetOptionalString(
+        JsonElement root,
+        string propertyName)
+    {
+        var property = root.GetProperty(propertyName);
+
+        return property.ValueKind == JsonValueKind.Null
+            ? null
+            : property.GetString();
+    }
+
+    private static int CountByStatus(
+        IEnumerable<WildfireDto> wildfires,
+        string? requestedStatus) =>
+        requestedStatus is null
+            ? wildfires.Count()
+            : wildfires.Count(
+                wildfire => string.Equals(
+                    wildfire.Status,
+                    requestedStatus,
+                    StringComparison.OrdinalIgnoreCase));
+
+    private static string FormatCountAnswer(
+        int count,
+        string? requestedStatus,
+        bool yesNo,
+        AskFiresightMapContext? mapContext = null)
+    {
+        var qualifier = requestedStatus is null
+            ? string.Empty
+            : $"{StageOfControlLabel(requestedStatus)} ";
+
+        var fireLabel = count == 1 ? "wildfire" : "wildfires";
+        var countText = count == 0
+            ? $"no {qualifier}{fireLabel}"
+            : $"{count} {qualifier}{fireLabel}";
+
+        var scope = mapContext is null
+            ? "in the current dataset"
+            : $"within {Math.Round(mapContext.RadiusKm):N0} km of {ShortLocationLabel(mapContext.Label)}";
+
+        if (!yesNo)
+        {
+            return $"Firesight shows {countText} {scope}.";
+        }
+
+        var prefix = count == 0 ? "No." : "Yes.";
+        return $"{prefix} Firesight shows {countText} {scope}.";
+    }
+
+    private static string ShortLocationLabel(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return "the selected location";
+        }
+
+        return label.Split(',', 2)[0].Trim();
+    }
+
+    private static string StageOfControlLabel(string status) =>
+        status.ToUpperInvariant() switch
+        {
+            "OC" => "out-of-control",
+            "BH" => "being held",
+            "UC" => "under control",
+            "EX" => "extinguished",
+            _ => status
+        };
+
     private sealed record ToolExecutionResult(
         string Output,
         GeocodedLocationDto? GeocodedLocation = null,
-        AskFiresightMapContext? MapContext = null);
+        AskFiresightMapContext? MapContext = null,
+        string? RequestedStatus = null,
+        string? ResponseMode = null,
+        IReadOnlyList<WildfireDto>? Wildfires = null,
+        IReadOnlyList<NearbyWildfireDto>? NearbyWildfires = null,
+        WildfireDto? Wildfire = null);
 }
 
 #pragma warning restore OPENAI001

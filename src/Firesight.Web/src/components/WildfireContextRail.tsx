@@ -8,26 +8,30 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import type { AskFiresightMapContext } from '../services/askFiresightService'
 import type { Wildfire } from '../services/wildfireService'
 import {
   formatArea,
   formatRelativeTime,
   stageOfControlLabel,
 } from '../utils/wildfirePresentation'
+import { AskFiresightPanel } from './AskFiresightPanel'
 import { NearbyWildfireSearch } from './NearbyWildfireSearch'
 
-type RailMode = 'recent' | 'nearby'
+type RailMode = 'recent' | 'nearby' | 'ask'
 
 interface WildfireContextRailProps {
   recentWildfires: Wildfire[]
   onWildfireSelect: (wildfire: Wildfire | null) => void
+  onShowAskResultOnMap: (context: AskFiresightMapContext) => Promise<void>
 }
 
 export function WildfireContextRail({
   recentWildfires,
   onWildfireSelect,
+  onShowAskResultOnMap,
 }: WildfireContextRailProps) {
-  const [mode, setMode] = useState<RailMode>('recent')
+  const [mode, setMode] = useState<RailMode>('ask')
 
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden', minWidth: 0 }}>
@@ -38,6 +42,12 @@ export function WildfireContextRail({
           variant="outlined"
           aria-label="Wildfire context"
         >
+          <Button
+            variant={mode === 'ask' ? 'contained' : 'outlined'}
+            onClick={() => setMode('ask')}
+          >
+            Ask AI
+          </Button>
           <Button
             variant={mode === 'recent' ? 'contained' : 'outlined'}
             onClick={() => setMode('recent')}
@@ -54,11 +64,17 @@ export function WildfireContextRail({
       </Box>
 
       <Box sx={{ p: 2.25 }}>
-        {mode === 'nearby' ? (
-          <NearbyWildfireSearch onSelect={onWildfireSelect} />
-        ) : (
+        <Box sx={{ display: mode === 'recent' ? 'block' : 'none' }}>
           <RecentlyUpdated wildfires={recentWildfires} />
-        )}
+        </Box>
+
+        <Box sx={{ display: mode === 'nearby' ? 'block' : 'none' }}>
+          <NearbyWildfireSearch onSelect={onWildfireSelect} />
+        </Box>
+
+        <Box sx={{ display: mode === 'ask' ? 'block' : 'none' }}>
+          <AskFiresightPanel onShowOnMap={onShowAskResultOnMap} />
+        </Box>
       </Box>
     </Paper>
   )

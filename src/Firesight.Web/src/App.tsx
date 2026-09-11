@@ -10,7 +10,6 @@ import {
   Typography,
 } from '@mui/material'
 import { AppHeader } from './components/AppHeader'
-import { AskFiresightPanel } from './components/AskFiresightPanel'
 import { ObservationFreshnessChart } from './components/ObservationFreshnessChart'
 import { WildfireContextRail } from './components/WildfireContextRail'
 import {
@@ -146,8 +145,6 @@ function App() {
             />
           </Paper>
 
-          <AskFiresightPanel onShowOnMap={handleShowAskResultOnMap} />
-
           {loading && (
             <Paper
               variant="outlined"
@@ -174,6 +171,7 @@ function App() {
               <WildfireContextRail
                 recentWildfires={recentWildfires}
                 onWildfireSelect={handleContextWildfireSelect}
+                onShowAskResultOnMap={handleShowAskResultOnMap}
               />
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>

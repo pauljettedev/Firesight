@@ -15,14 +15,13 @@ namespace Firesight.UnitTests;
 public sealed class OpenAiAskFiresightServiceTests
 {
     [Fact]
-    public async Task AskAsync_ExecutesToolAndReturnsFinalAnswer()
+    public async Task AskAsync_ReturnsDeterministicCountFromToolData()
     {
         var client = CreateClient(
             CreateFunctionCallResponse(
                 "call-1",
                 "get_active_wildfires",
-                "{}"),
-            CreateAnswerResponse("There are two current wildfire records."));
+                """{"status":null,"responseMode":"count"}"""));
 
         var wildfireService = new Mock<IWildfireService>();
         wildfireService
@@ -43,7 +42,7 @@ public sealed class OpenAiAskFiresightServiceTests
             "How many wildfire records are currently available?");
 
         Assert.Equal(
-            "There are two current wildfire records.",
+            "Firesight shows 2 wildfires in the current dataset.",
             result.Answer);
         Assert.Equal(
             ["get_active_wildfires"],
@@ -54,6 +53,81 @@ public sealed class OpenAiAskFiresightServiceTests
             service => service.GetActiveWildfiresAsync(
                 It.IsAny<CancellationToken>()),
             Times.Once);
+        client.Verify(
+            responseClient => responseClient.CreateResponseAsync(
+                It.IsAny<CreateResponseOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AskAsync_ReturnsDeterministicStatusCountForLocationSearch()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "geocode_location",
+                """{"query":"Ottawa, ON"}"""),
+            CreateFunctionCallResponse(
+                "call-2",
+                "find_wildfires_near_location",
+                """
+                {
+                  "latitude": 45.4215,
+                  "longitude": -75.6972,
+                  "radiusKm": 200,
+                  "status": "OC",
+                  "responseMode": "exists"
+                }
+                """));
+
+        var geocoder = new Mock<ILocationGeocoder>();
+        geocoder
+            .Setup(service => service.FindAsync(
+                "Ottawa, ON",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new GeocodedLocationDto(
+                    "Ottawa, Ontario, Canada",
+                    45.4215,
+                    -75.6972));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.FindWildfiresNearAsync(
+                45.4215,
+                -75.6972,
+                200,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    new NearbyWildfireDto(
+                        CreateWildfire("2026_QC_TEST_001", "OC"),
+                        55),
+                    new NearbyWildfireDto(
+                        CreateWildfire("2026_ON_TEST_002", "UC"),
+                        90)
+                ]);
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            geocoder.Object);
+
+        var result = await service.AskAsync(
+            "Are there any out-of-control fires near Ottawa?");
+
+        Assert.Equal(
+            "Yes. Firesight shows 1 out-of-control wildfire within 200 km of Ottawa.",
+            result.Answer);
+        Assert.NotNull(result.MapContext);
+        Assert.Equal(200, result.MapContext.RadiusKm);
+
+        client.Verify(
+            responseClient => responseClient.CreateResponseAsync(
+                It.IsAny<CreateResponseOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
     }
 
     [Fact]
@@ -71,10 +145,11 @@ public sealed class OpenAiAskFiresightServiceTests
                 {
                   "latitude": 50.6758,
                   "longitude": -120.3394,
-                  "radiusKm": 200
+                  "radiusKm": 200,
+                  "status": null,
+                  "responseMode": "exists"
                 }
-                """),
-            CreateAnswerResponse("There are fires near Kamloops."));
+                """));
 
         var geocoder = new Mock<ILocationGeocoder>();
         geocoder
@@ -104,6 +179,9 @@ public sealed class OpenAiAskFiresightServiceTests
         var result = await service.AskAsync(
             "Are there fires near Kamloops?");
 
+        Assert.Equal(
+            "No. Firesight shows no wildfires within 200 km of Kamloops.",
+            result.Answer);
         Assert.NotNull(result.MapContext);
         Assert.Equal(50.6758, result.MapContext.Latitude);
         Assert.Equal(-120.3394, result.MapContext.Longitude);
@@ -119,12 +197,14 @@ public sealed class OpenAiAskFiresightServiceTests
             ResponseItem.CreateFunctionCallItem(
                 "call-1",
                 "get_active_wildfires",
-                BinaryData.FromString("{}")));
+                BinaryData.FromString(
+                    """{"status":null,"responseMode":"records"}""")));
         firstResponse.OutputItems.Add(
             ResponseItem.CreateFunctionCallItem(
                 "call-2",
                 "get_active_wildfires",
-                BinaryData.FromString("{}")));
+                BinaryData.FromString(
+                    """{"status":null,"responseMode":"records"}""")));
 
         var client = CreateClient(
             firstResponse,
@@ -162,7 +242,9 @@ public sealed class OpenAiAskFiresightServiceTests
                     {
                       "latitude": 45.4215,
                       "longitude": -75.6972,
-                      "radiusKm": -1
+                      "radiusKm": -1,
+                      "status": null,
+                      "responseMode": "records"
                     }
                     """)),
             ToClientResult(
@@ -255,7 +337,7 @@ public sealed class OpenAiAskFiresightServiceTests
                     CreateFunctionCallResponse(
                         "call-1",
                         "get_active_wildfires",
-                        "{}")));
+                        """{"status":null,"responseMode":"records"}""")));
 
         var wildfireService = new Mock<IWildfireService>();
         wildfireService
@@ -343,7 +425,9 @@ public sealed class OpenAiAskFiresightServiceTests
             response,
             Mock.Of<PipelineResponse>());
 
-    private static WildfireDto CreateWildfire(string externalId) =>
+    private static WildfireDto CreateWildfire(
+        string externalId,
+        string status = "OC") =>
         new(
             Guid.NewGuid(),
             externalId,
@@ -353,7 +437,7 @@ public sealed class OpenAiAskFiresightServiceTests
             -75.6972,
             null,
             100,
-            "OUT",
+            status,
             DateTime.UtcNow,
             DateTime.UtcNow,
             false);
