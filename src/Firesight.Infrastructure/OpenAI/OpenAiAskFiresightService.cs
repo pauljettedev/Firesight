@@ -20,9 +20,11 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
 
         For questions about current wildfire conditions, use the supplied Firesight tools rather than guessing.
         Use geocode_location before find_wildfires_near_location when the user gives a place name instead of coordinates.
+        If the user asks about fires near a place without specifying a distance, use a 200 km radius.
         Treat tool output as the authoritative Firesight dataset for the answer.
         Never invent wildfire records, identifiers, statuses, sizes, locations, timestamps, or distances.
         Distinguish dataset synchronization freshness from the observation timestamps on individual wildfire records.
+        Use human-facing wildfire terminology rather than internal property names or raw field labels unless the user asks for raw data.
         Firesight is a demo and not an emergency information service. When safety or evacuation decisions are involved,
         tell the user to verify information with official wildfire and emergency authorities.
         Answer clearly and concisely.
@@ -165,6 +167,8 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
 
         var toolsUsed = new List<string>();
         var toolNamesUsed = new HashSet<string>(StringComparer.Ordinal);
+        GeocodedLocationDto? lastGeocodedLocation = null;
+        AskFiresightMapContext? mapContext = null;
 
         for (var round = 0; round < MaxToolRounds; round++)
         {
@@ -201,7 +205,8 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
 
                 return new AskFiresightResult(
                     answer,
-                    toolsUsed);
+                    toolsUsed,
+                    mapContext);
             }
 
             foreach (var functionCall in functionCalls)
@@ -211,14 +216,25 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
                     toolsUsed.Add(functionCall.FunctionName);
                 }
 
-                var output = await ExecuteToolAsync(
+                var execution = await ExecuteToolAsync(
                     functionCall,
+                    lastGeocodedLocation,
                     cancellationToken);
+
+                if (execution.GeocodedLocation is not null)
+                {
+                    lastGeocodedLocation = execution.GeocodedLocation;
+                }
+
+                if (execution.MapContext is not null)
+                {
+                    mapContext = execution.MapContext;
+                }
 
                 inputItems.Add(
                     new FunctionCallOutputResponseItem(
                         functionCall.CallId,
-                        output));
+                        execution.Output));
             }
         }
 
@@ -226,8 +242,9 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
             $"Ask Firesight exceeded the maximum of {MaxToolRounds} tool-call rounds.");
     }
 
-    private async Task<string> ExecuteToolAsync(
+    private async Task<ToolExecutionResult> ExecuteToolAsync(
         FunctionCallResponseItem functionCall,
+        GeocodedLocationDto? lastGeocodedLocation,
         CancellationToken cancellationToken)
     {
         try
@@ -237,50 +254,97 @@ public sealed class OpenAiAskFiresightService : IAskFiresightService
 
             var root = arguments.RootElement;
 
-            object? result = functionCall.FunctionName switch
+            switch (functionCall.FunctionName)
             {
-                "geocode_location" =>
-                    await locationGeocoder.FindAsync(
+                case "geocode_location":
+                {
+                    var location = await locationGeocoder.FindAsync(
                         root.GetProperty("query").GetString()!,
-                        cancellationToken),
+                        cancellationToken);
 
-                "get_active_wildfires" =>
-                    await wildfireService.GetActiveWildfiresAsync(
-                        cancellationToken),
+                    return new ToolExecutionResult(
+                        JsonSerializer.Serialize(location, JsonOptions),
+                        location);
+                }
 
-                "get_wildfire_by_external_id" =>
-                    await wildfireService.GetWildfireByExternalIdAsync(
+                case "get_active_wildfires":
+                {
+                    var result = await wildfireService.GetActiveWildfiresAsync(
+                        cancellationToken);
+
+                    return new ToolExecutionResult(
+                        JsonSerializer.Serialize(result, JsonOptions));
+                }
+
+                case "get_wildfire_by_external_id":
+                {
+                    var result = await wildfireService.GetWildfireByExternalIdAsync(
                         root.GetProperty("externalId").GetString()!,
-                        cancellationToken),
+                        cancellationToken);
 
-                "find_wildfires_near_location" =>
-                    await wildfireService.FindWildfiresNearAsync(
-                        root.GetProperty("latitude").GetDouble(),
-                        root.GetProperty("longitude").GetDouble(),
-                        root.GetProperty("radiusKm").GetDouble(),
-                        cancellationToken),
+                    return new ToolExecutionResult(
+                        JsonSerializer.Serialize(result, JsonOptions));
+                }
 
-                "get_feed_sync_state" =>
-                    await wildfireService.GetFeedSyncStateAsync(
-                        cancellationToken),
+                case "find_wildfires_near_location":
+                {
+                    var latitude = root.GetProperty("latitude").GetDouble();
+                    var longitude = root.GetProperty("longitude").GetDouble();
+                    var radiusKm = root.GetProperty("radiusKm").GetDouble();
 
-                _ => throw new InvalidOperationException(
-                    $"Unsupported Firesight tool '{functionCall.FunctionName}'.")
-            };
+                    var result = await wildfireService.FindWildfiresNearAsync(
+                        latitude,
+                        longitude,
+                        radiusKm,
+                        cancellationToken);
 
-            return JsonSerializer.Serialize(result, JsonOptions);
+                    var label =
+                        lastGeocodedLocation is not null &&
+                        Math.Abs(lastGeocodedLocation.Latitude - latitude) < 0.001 &&
+                        Math.Abs(lastGeocodedLocation.Longitude - longitude) < 0.001
+                            ? lastGeocodedLocation.DisplayName
+                            : null;
+
+                    return new ToolExecutionResult(
+                        JsonSerializer.Serialize(result, JsonOptions),
+                        MapContext: new AskFiresightMapContext(
+                            latitude,
+                            longitude,
+                            radiusKm,
+                            label));
+                }
+
+                case "get_feed_sync_state":
+                {
+                    var result = await wildfireService.GetFeedSyncStateAsync(
+                        cancellationToken);
+
+                    return new ToolExecutionResult(
+                        JsonSerializer.Serialize(result, JsonOptions));
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported Firesight tool '{functionCall.FunctionName}'.");
+            }
         }
         catch (ApplicationValidationException exception)
         {
-            return JsonSerializer.Serialize(
-                new
-                {
-                    error = "Firesight rejected the tool arguments.",
-                    validationErrors = exception.Errors
-                },
-                JsonOptions);
+            return new ToolExecutionResult(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        error = "Firesight rejected the tool arguments.",
+                        validationErrors = exception.Errors
+                    },
+                    JsonOptions));
         }
     }
+
+    private sealed record ToolExecutionResult(
+        string Output,
+        GeocodedLocationDto? GeocodedLocation = null,
+        AskFiresightMapContext? MapContext = null);
 }
 
 #pragma warning restore OPENAI001

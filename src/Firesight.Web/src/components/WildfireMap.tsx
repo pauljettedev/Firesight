@@ -12,16 +12,25 @@ import './WildfireMap.css'
 import type { Wildfire } from '../services/wildfireService'
 import { WildfirePopup } from './WildfirePopup'
 
+export interface WildfireMapFocusArea {
+  latitude: number
+  longitude: number
+  radiusKm: number
+}
+
 interface WildfireMapProps {
   wildfires: Wildfire[]
   selectedWildfire?: Wildfire | null
   onWildfireSelect?: (wildfire: Wildfire | null) => void
+  focusArea?: WildfireMapFocusArea
 }
 
 const sourceId = 'wildfires'
 const pointsLayerId = 'wildfire-points'
 const selectionLayerId = 'wildfire-selection'
 const noSelectionId = '__no_selection__'
+const defaultMapCenter: [number, number] = [-96, 57]
+const defaultMapZoom = 2.7
 
 function toGeoJson(wildfires: Wildfire[]) {
   return {
@@ -60,6 +69,7 @@ export function WildfireMap({
   wildfires,
   selectedWildfire,
   onWildfireSelect,
+  focusArea,
 }: WildfireMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -69,6 +79,7 @@ export function WildfireMap({
   const activePopupRef = useRef<maplibregl.Popup | null>(null)
   const activePopupWildfireIdRef = useRef<string | null>(null)
   const mapSelectedWildfireIdRef = useRef<string | null>(null)
+  const hadFocusAreaRef = useRef(false)
 
   useEffect(() => {
     wildfiresRef.current = wildfires
@@ -89,8 +100,8 @@ export function WildfireMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      center: [-96, 57],
-      zoom: 2.7,
+      center: defaultMapCenter,
+      zoom: defaultMapZoom,
       style: {
         version: 8,
         sources: {
@@ -301,6 +312,54 @@ export function WildfireMap({
       essential: true,
     })
   }, [selectedWildfire])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map?.isStyleLoaded()) {
+      return
+    }
+
+    if (!focusArea) {
+      if (!hadFocusAreaRef.current) {
+        return
+      }
+
+      hadFocusAreaRef.current = false
+      map.easeTo({
+        center: defaultMapCenter,
+        zoom: defaultMapZoom,
+        duration: 800,
+      })
+      return
+    }
+
+    hadFocusAreaRef.current = true
+
+    const latitudeDelta = focusArea.radiusKm / 111
+    const longitudeScale = Math.max(
+      Math.cos((focusArea.latitude * Math.PI) / 180),
+      0.15,
+    )
+    const longitudeDelta = focusArea.radiusKm / (111 * longitudeScale)
+
+    map.fitBounds(
+      [
+        [
+          focusArea.longitude - longitudeDelta,
+          focusArea.latitude - latitudeDelta,
+        ],
+        [
+          focusArea.longitude + longitudeDelta,
+          focusArea.latitude + latitudeDelta,
+        ],
+      ],
+      {
+        padding: 48,
+        duration: 800,
+        maxZoom: 10,
+      },
+    )
+  }, [focusArea])
 
   return (
     <div

@@ -48,11 +48,67 @@ public sealed class OpenAiAskFiresightServiceTests
         Assert.Equal(
             ["get_active_wildfires"],
             result.ToolsUsed);
+        Assert.Null(result.MapContext);
 
         wildfireService.Verify(
             service => service.GetActiveWildfiresAsync(
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task AskAsync_ReturnsMapContextForLocationSearch()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "geocode_location",
+                """{"query":"Kamloops, BC"}"""),
+            CreateFunctionCallResponse(
+                "call-2",
+                "find_wildfires_near_location",
+                """
+                {
+                  "latitude": 50.6758,
+                  "longitude": -120.3394,
+                  "radiusKm": 200
+                }
+                """),
+            CreateAnswerResponse("There are fires near Kamloops."));
+
+        var geocoder = new Mock<ILocationGeocoder>();
+        geocoder
+            .Setup(service => service.FindAsync(
+                "Kamloops, BC",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new GeocodedLocationDto(
+                    "Kamloops, Thompson-Nicola Regional District, British Columbia, Canada",
+                    50.6758,
+                    -120.3394));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.FindWildfiresNearAsync(
+                50.6758,
+                -120.3394,
+                200,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            geocoder.Object);
+
+        var result = await service.AskAsync(
+            "Are there fires near Kamloops?");
+
+        Assert.NotNull(result.MapContext);
+        Assert.Equal(50.6758, result.MapContext.Latitude);
+        Assert.Equal(-120.3394, result.MapContext.Longitude);
+        Assert.Equal(200, result.MapContext.RadiusKm);
+        Assert.Contains("Kamloops", result.MapContext.Label);
     }
 
     [Fact]
@@ -151,6 +207,7 @@ public sealed class OpenAiAskFiresightServiceTests
         Assert.Equal(
             "The requested radius was invalid.",
             result.Answer);
+        Assert.Null(result.MapContext);
 
         var toolOutput = requests[1]
             .InputItems

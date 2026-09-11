@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import {
   askFiresight,
+  type AskFiresightMapContext,
   type AskFiresightResult,
 } from '../services/askFiresightService'
 
@@ -31,11 +32,18 @@ const toolLabels: Record<string, string> = {
   get_feed_sync_state: 'Dataset freshness',
 }
 
-export function AskFiresightPanel() {
+interface AskFiresightPanelProps {
+  onShowOnMap: (context: AskFiresightMapContext) => Promise<void>
+}
+
+export function AskFiresightPanel({
+  onShowOnMap,
+}: AskFiresightPanelProps) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState<AskFiresightResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [mapLoading, setMapLoading] = useState(false)
 
   const trimmedQuestion = question.trim()
   const canSubmit =
@@ -67,7 +75,24 @@ export function AskFiresightPanel() {
     }
   }
 
-  function useExample(example: string) {
+  async function handleShowOnMap(context: AskFiresightMapContext) {
+    setMapLoading(true)
+    setError(null)
+
+    try {
+      await onShowOnMap(context)
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Firesight failed to update the map.',
+      )
+    } finally {
+      setMapLoading(false)
+    }
+  }
+
+  function selectExample(example: string) {
     setQuestion(example)
     setResult(null)
     setError(null)
@@ -183,7 +208,7 @@ export function AskFiresightPanel() {
                     type="button"
                     size="small"
                     variant="text"
-                    onClick={() => useExample(example)}
+                    onClick={() => selectExample(example)}
                     sx={{
                       minWidth: 0,
                       px: 0.75,
@@ -217,31 +242,53 @@ export function AskFiresightPanel() {
                   {result.answer}
                 </Typography>
 
-                {result.toolsUsed.length > 0 && (
-                  <Box
-                    sx={{
-                      mt: 1.5,
-                      display: 'flex',
-                      gap: 0.75,
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      Used Firesight data:
-                    </Typography>
+                <Box
+                  sx={{
+                    mt: 1.5,
+                    display: 'flex',
+                    gap: 0.75,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                  }}
+                >
+                  {result.toolsUsed.length > 0 && (
+                    <>
+                      <Typography variant="caption" color="text.secondary">
+                        Used Firesight data:
+                      </Typography>
 
-                    {result.toolsUsed.map((tool) => (
-                      <Chip
-                        key={tool}
-                        label={toolLabels[tool] ?? tool}
-                        size="small"
-                        variant="outlined"
-                        sx={{ height: 24 }}
-                      />
-                    ))}
-                  </Box>
-                )}
+                      {result.toolsUsed.map((tool) => (
+                        <Chip
+                          key={tool}
+                          label={toolLabels[tool] ?? tool}
+                          size="small"
+                          variant="outlined"
+                          sx={{ height: 24 }}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {result.mapContext && (
+                    <Button
+                      type="button"
+                      size="small"
+                      variant="outlined"
+                      disabled={mapLoading}
+                      onClick={() => void handleShowOnMap(result.mapContext!)}
+                      sx={{
+                        ml: { sm: 'auto' },
+                        textTransform: 'none',
+                      }}
+                    >
+                      {mapLoading ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        `Show ${formatRadius(result.mapContext.radiusKm)} area on map`
+                      )}
+                    </Button>
+                  )}
+                </Box>
               </Box>
             )}
           </Stack>
@@ -249,4 +296,8 @@ export function AskFiresightPanel() {
       </Box>
     </Paper>
   )
+}
+
+function formatRadius(radiusKm: number): string {
+  return `${Math.round(radiusKm).toLocaleString()} km`
 }

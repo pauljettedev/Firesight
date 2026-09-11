@@ -1,6 +1,14 @@
+export interface AskFiresightMapContext {
+  latitude: number
+  longitude: number
+  radiusKm: number
+  label: string | null
+}
+
 export interface AskFiresightResult {
   answer: string
   toolsUsed: string[]
+  mapContext: AskFiresightMapContext | null
 }
 
 export async function askFiresight(
