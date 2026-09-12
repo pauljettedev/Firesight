@@ -30,3 +30,6 @@ coverage/
 
 # Other
 .zip
+
+# Personal Claude Code preferences (not shared project guidance)
+CLAUDE.local.md
