@@ -4,6 +4,7 @@ using Firesight.Application.Common;
 using Firesight.Application.Locations;
 using Firesight.Application.Wildfires;
 using Firesight.Infrastructure.Claude;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -128,6 +129,116 @@ public sealed class ClaudeAskFiresightServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_DoesNotLeakMapContextIntoUnrelatedDatasetWideAnswer()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "find_wildfires_near_location",
+                """
+                {
+                  "latitude": 50.6758,
+                  "longitude": -120.3394,
+                  "radiusKm": 200,
+                  "status": null,
+                  "responseMode": "records"
+                }
+                """),
+            CreateFunctionCallResponse(
+                "call-2",
+                "get_active_wildfires",
+                """{"status":null,"responseMode":"count"}"""));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.FindWildfiresNearAsync(
+                50.6758,
+                -120.3394,
+                200,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    new NearbyWildfireDto(CreateWildfire("2026_BC_TEST_001"), 40)
+                ]);
+        wildfireService
+            .Setup(service => service.GetActiveWildfiresAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    CreateWildfire("2026_ON_TEST_001"),
+                    CreateWildfire("2026_ON_TEST_002")
+                ]);
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            Mock.Of<ILocationGeocoder>());
+
+        var result = await service.AskAsync(
+            "What fires are near Kamloops, and how many fires total?");
+
+        Assert.Equal(
+            "Firesight shows 2 wildfires in the current dataset.",
+            result.Answer);
+        Assert.Null(result.MapContext);
+    }
+
+    [Fact]
+    public async Task AskAsync_DoesNotLeakMapContextIntoUnrelatedFreeTextAnswer()
+    {
+        // Same leak as above, but reaching the model's own free-text final answer
+        // (no deterministic short-circuit) rather than a count/status answer.
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "find_wildfires_near_location",
+                """
+                {
+                  "latitude": 50.6758,
+                  "longitude": -120.3394,
+                  "radiusKm": 200,
+                  "status": null,
+                  "responseMode": "records"
+                }
+                """),
+            CreateFunctionCallResponse(
+                "call-2",
+                "get_active_wildfires",
+                """{"status":null,"responseMode":"records"}"""),
+            CreateAnswerResponse("There is one fire near Kamloops and two fires nationwide."));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.FindWildfiresNearAsync(
+                50.6758,
+                -120.3394,
+                200,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    new NearbyWildfireDto(CreateWildfire("2026_BC_TEST_001"), 40)
+                ]);
+        wildfireService
+            .Setup(service => service.GetActiveWildfiresAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    CreateWildfire("2026_ON_TEST_001"),
+                    CreateWildfire("2026_ON_TEST_002")
+                ]);
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            Mock.Of<ILocationGeocoder>());
+
+        var result = await service.AskAsync(
+            "What's near Kamloops, and how many fires are there nationwide?");
+
+        Assert.Null(result.MapContext);
+    }
+
+    [Fact]
     public async Task AskAsync_ReturnsMapContextForLocationSearch()
     {
         var client = CreateClient(
@@ -189,24 +300,15 @@ public sealed class ClaudeAskFiresightServiceTests
     [Fact]
     public async Task AskAsync_DeduplicatesToolsUsed()
     {
-        var firstResponse = new Message
-        {
-            Content =
-            [
-                new ToolUseBlock
-                {
-                    ID = "call-1",
-                    Name = "get_active_wildfires",
-                    Input = ParseInput("""{"status":null,"responseMode":"records"}""")
-                },
-                new ToolUseBlock
-                {
-                    ID = "call-2",
-                    Name = "get_active_wildfires",
-                    Input = ParseInput("""{"status":null,"responseMode":"records"}""")
-                }
-            ]
-        };
+        var firstResponse = CreateMessage(
+            CreateToolUseBlock(
+                "call-1",
+                "get_active_wildfires",
+                ParseInput("""{"status":null,"responseMode":"records"}""")),
+            CreateToolUseBlock(
+                "call-2",
+                "get_active_wildfires",
+                ParseInput("""{"status":null,"responseMode":"records"}""")));
 
         var client = CreateClient(
             firstResponse,
@@ -233,23 +335,16 @@ public sealed class ClaudeAskFiresightServiceTests
     [Fact]
     public async Task AskAsync_ContinuesToolLoopWhenResponseIncludesThinkingBlock()
     {
-        var firstResponse = new Message
-        {
-            Content =
-            [
-                new ThinkingBlock
-                {
-                    Thinking = "I should check the current wildfire records.",
-                    Signature = "sig-123"
-                },
-                new ToolUseBlock
-                {
-                    ID = "call-1",
-                    Name = "get_active_wildfires",
-                    Input = ParseInput("""{"status":null,"responseMode":"records"}""")
-                }
-            ]
-        };
+        var firstResponse = CreateMessage(
+            new ThinkingBlock
+            {
+                Thinking = "I should check the current wildfire records.",
+                Signature = "sig-123"
+            },
+            CreateToolUseBlock(
+                "call-1",
+                "get_active_wildfires",
+                ParseInput("""{"status":null,"responseMode":"records"}""")));
 
         var client = CreateClient(
             firstResponse,
@@ -342,7 +437,7 @@ public sealed class ClaudeAskFiresightServiceTests
     [Fact]
     public async Task AskAsync_ThrowsWhenModelReturnsNoAnswer()
     {
-        var client = CreateClient(new Message { Content = [] });
+        var client = CreateClient(CreateMessage());
 
         var service = CreateService(
             client.Object,
@@ -408,7 +503,8 @@ public sealed class ClaudeAskFiresightServiceTests
                     Model = "test-model"
                 }),
             wildfireService,
-            locationGeocoder);
+            locationGeocoder,
+            NullLogger<ClaudeAskFiresightService>.Instance);
 
     private static Mock<IClaudeMessagesClient> CreateClient(
         params Message[] responses)
@@ -431,23 +527,42 @@ public sealed class ClaudeAskFiresightServiceTests
         string callId,
         string toolName,
         string argumentsJson) =>
-        new()
-        {
-            Content =
-            [
-                new ToolUseBlock
-                {
-                    ID = callId,
-                    Name = toolName,
-                    Input = ParseInput(argumentsJson)
-                }
-            ]
-        };
+        CreateMessage(CreateToolUseBlock(callId, toolName, ParseInput(argumentsJson)));
 
     private static Message CreateAnswerResponse(string answer) =>
+        CreateMessage(new TextBlock { Text = answer, Citations = default! });
+
+    // The real SDK marks several Message/ToolUseBlock fields `required` (ID, Usage,
+    // StopReason, Caller, etc.) even though they're irrelevant here — these are fake
+    // API responses for tests, and only Content actually drives the code under test.
+    // `default!` satisfies "must be set" without needing to fabricate real values.
+    private static Message CreateMessage(params ContentBlock[] content) =>
         new()
         {
-            Content = [new TextBlock { Text = answer }]
+            // Spread into a fresh collection expression rather than assigning the
+            // array directly — this target-types to whatever Content's real
+            // declared collection type is, the same way the working code elsewhere
+            // in this file builds it, without needing to know that type here.
+            Content = [.. content],
+            ID = default!,
+            Container = default!,
+            Model = default!,
+            StopDetails = default!,
+            StopReason = default!,
+            StopSequence = default!,
+            Usage = default!
+        };
+
+    private static ToolUseBlock CreateToolUseBlock(
+        string id,
+        string name,
+        Dictionary<string, JsonElement> input) =>
+        new()
+        {
+            ID = id,
+            Name = name,
+            Input = input,
+            Caller = default!
         };
 
     private static Dictionary<string, JsonElement> ParseInput(string json) =>

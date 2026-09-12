@@ -4,6 +4,7 @@ using Firesight.Application.AskFiresight;
 using Firesight.Application.Common;
 using Firesight.Application.Locations;
 using Firesight.Application.Wildfires;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Firesight.Infrastructure.Claude;
@@ -70,8 +71,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     }
                     """)
             },
-            Required = ["query"],
-            AdditionalProperties = false
+            Required = ["query"]
         }
     };
 
@@ -101,8 +101,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     }
                     """)
             },
-            Required = ["status", "responseMode"],
-            AdditionalProperties = false
+            Required = ["status", "responseMode"]
         }
     };
 
@@ -131,8 +130,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     }
                     """)
             },
-            Required = ["externalId", "responseMode"],
-            AdditionalProperties = false
+            Required = ["externalId", "responseMode"]
         }
     };
 
@@ -183,8 +181,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     }
                     """)
             },
-            Required = ["latitude", "longitude", "radiusKm", "status", "responseMode"],
-            AdditionalProperties = false
+            Required = ["latitude", "longitude", "radiusKm", "status", "responseMode"]
         }
     };
 
@@ -196,8 +193,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         InputSchema = new()
         {
             Properties = new Dictionary<string, JsonElement>(),
-            Required = [],
-            AdditionalProperties = false
+            Required = []
         }
     };
 
@@ -205,17 +201,20 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     private readonly string model;
     private readonly IWildfireService wildfireService;
     private readonly ILocationGeocoder locationGeocoder;
+    private readonly ILogger<ClaudeAskFiresightService> logger;
 
     public ClaudeAskFiresightService(
         IClaudeMessagesClient client,
         IOptions<ClaudeOptions> options,
         IWildfireService wildfireService,
-        ILocationGeocoder locationGeocoder)
+        ILocationGeocoder locationGeocoder,
+        ILogger<ClaudeAskFiresightService> logger)
     {
         this.client = client;
         model = options.Value.Model;
         this.wildfireService = wildfireService;
         this.locationGeocoder = locationGeocoder;
+        this.logger = logger;
     }
 
     public async Task<AskFiresightResult> AskAsync(
@@ -330,10 +329,11 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     lastGeocodedLocation = execution.GeocodedLocation;
                 }
 
-                if (execution.MapContext is not null)
-                {
-                    mapContext = execution.MapContext;
-                }
+                // Always overwrite, even with null: a tool call that isn't a location
+                // search means the conversation has moved on, so any earlier round's
+                // map location should stop applying — otherwise it can leak into a
+                // later, unrelated answer (including the plain-text final answer).
+                mapContext = execution.MapContext;
 
                 // For count/exists/status questions, WE compute the answer from the
                 // tool's real data instead of asking Claude to say it — if we can,
@@ -490,6 +490,29 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     },
                     JsonOptions));
         }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A dependency (e.g. Nominatim) failing transiently shouldn't crash the
+            // whole /api/ask request — report it back to the model as a tool error
+            // instead, same as a validation failure, so the conversation can continue
+            // or degrade gracefully. Log it ourselves since swallowing it here means
+            // ApiExceptionHandler never sees it to log it for us.
+            //
+            // Guarding on cancellationToken.IsCancellationRequested rather than the
+            // exception's type matters here: an HttpClient timeout inside a tool call
+            // throws TaskCanceledException, which IS an OperationCanceledException —
+            // excluding that type entirely would let a plain network timeout slip
+            // past this handler uncaught, the exact failure this fix exists for.
+            logger.LogWarning(
+                exception,
+                "Ask Firesight tool '{ToolName}' failed.",
+                toolUse.Name);
+
+            return new ToolExecutionResult(
+                JsonSerializer.Serialize(
+                    new { error = "Firesight could not complete this tool call." },
+                    JsonOptions));
+        }
     }
 
     private static AskFiresightResult? TryCreateDeterministicAnswer(
@@ -521,23 +544,27 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     execution.Wildfires,
                     execution.RequestedStatus);
 
+                // Dataset-wide count is never location-scoped — pass null rather
+                // than an earlier round's mapContext, which could be from an
+                // unrelated location search earlier in this same conversation.
                 return new AskFiresightResult(
                     FormatCountAnswer(
                         count,
                         execution.RequestedStatus,
                         execution.ResponseMode == "exists"),
                     toolsUsed,
-                    mapContext);
+                    null);
             }
         }
 
         if (execution.ResponseMode == "status" &&
             execution.Wildfire is not null)
         {
+            // Same reasoning: a by-ID status lookup isn't location-scoped either.
             return new AskFiresightResult(
                 $"{execution.Wildfire.ExternalId} is {StageOfControlLabel(execution.Wildfire.Status)}.",
                 toolsUsed,
-                mapContext);
+                null);
         }
 
         return null;

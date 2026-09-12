@@ -1,4 +1,5 @@
 using Firesight.Application.AskFiresight;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Firesight.Api.Endpoints;
 
@@ -9,8 +10,11 @@ public static class AskFiresightEndpoints
     public static IEndpointRouteBuilder MapAskFiresightEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
+        // Caps requests per IP (policy defined in Program.cs) — AI calls cost
+        // real money per request, so this is the one endpoint that needs it.
         var group = endpoints.MapGroup("/api/ask")
-            .WithTags("Ask Firesight");
+            .WithTags("Ask Firesight")
+            .RequireRateLimiting("AskFiresight");
 
         group.MapPost("/", async (
             AskFiresightRequest request,
