@@ -57,6 +57,35 @@ public sealed class CwfisWildfireSourceSchemaTests
     }
 
     [Fact]
+    public async Task TreatsNegativeFireSizeAsNotReported()
+    {
+        const string json = """
+        {
+          "type": "FeatureCollection",
+          "numberMatched": 1,
+          "numberReturned": 1,
+          "features": [{
+            "type": "Feature",
+            "id": "cwfif_national_activefires.1",
+            "geometry": { "type": "Point", "coordinates": [-79.12345, 46.54321] },
+            "properties": {
+              "agency_code": "ON",
+              "national_fire_id": "2026_ON_NIP_FIRE_110",
+              "fire_size": -1,
+              "stage_of_control_status": "OC"
+            }
+          }]
+        }
+        """;
+
+        using var client = new HttpClient(new SequenceJsonHandler(json));
+        var result = await CreateSource(client).GetActiveWildfiresAsync();
+
+        var fire = Assert.Single(result.Records);
+        Assert.Null(fire.AreaHectares);
+    }
+
+    [Fact]
     public async Task RejectsFeatureWithoutNationalFireId()
     {
         const string json = """

@@ -31,6 +31,8 @@ record_end > <snapshot UTC>
 
 The CWFIS GeoServer layer does not expose a primary key that GeoServer can use for natural-order paging. A paged request using `startIndex` without an explicit sort is rejected by the server. Firesight therefore requests a deterministic manual sort on `national_fire_id` and pages through the filtered current snapshot using `count` and `startIndex`.
 
+A single-field sort on `national_fire_id` is only safe if the filtered current snapshot never contains more than one row per fire — the unfiltered historical feed (`cwfif_national_reportedfires`) does not have this guarantee, since the same fire is legitimately reported on multiple days. Verified against live API output (2026-09-12): a full current-snapshot pull returned 480 active fires with 480 unique `national_fire_id` values — no duplicates within a single snapshot, confirming the single-field sort is safe for this specific query. See `docs/cwfis-historical-reference.md` for the historical-feed pagination requirements this does not apply to.
+
 The snapshot timestamp is captured once per synchronization attempt and reused for every page so that a multi-page fetch cannot drift across different validity instants. If any page fails, the source fetch fails rather than treating a partial set of pages as a successful dataset refresh.
 
 ## CWFIS 2.0 active-fire schema
