@@ -86,5 +86,6 @@ MCP is a separate interface from the REST API but both call the same `Firesight.
 - `docs/architecture.md` — layering/dependency rules in full
 - `docs/api.md` — REST endpoint contracts
 - `docs/data-sources.md` — CWFIS ingestion, schema mapping, freshness semantics
+- `docs/cwfis-historical-reference.md` — CWFIS historical/time-series data (`cwfif_national_reportedfires`, NBAC), for a not-yet-built historical-query feature; live-verified field schema, query syntax, and a recommendation to query live rather than store a local historical copy
 - `docs/mcp.md` — MCP tool contracts and design rules
 - `docs/decisions/*.md` — ADRs (stack choice, CWFIS, PostGIS, freshness model)
