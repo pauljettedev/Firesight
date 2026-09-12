@@ -20,7 +20,7 @@ React / TypeScript / MUI / MapLibre
                 |
      Firesight.Infrastructure
       |        |         |
-      |        |         +--> OpenAI
+      |        |         +--> Claude (Anthropic)
       |        +------------> CWFIS
       +---------------------> PostgreSQL/PostGIS
 
@@ -64,7 +64,7 @@ Both REST endpoints and MCP tools should reuse this layer.
 
 Core domain models and domain rules.
 
-This project remains independent of transport, persistence, and external-system concerns. It does not reference EF Core, Npgsql, PostgreSQL, HTTP, OpenAI, or CWFIS. It does use NetTopologySuite geometry types for spatial domain data.
+This project remains independent of transport, persistence, and external-system concerns. It does not reference EF Core, Npgsql, PostgreSQL, HTTP, Claude/Anthropic, or CWFIS. It does use NetTopologySuite geometry types for spatial domain data.
 
 ### Firesight.Infrastructure
 
@@ -76,7 +76,7 @@ Responsibilities:
 - Npgsql
 - NetTopologySuite
 - CWFIS integration
-- OpenAI integration
+- Claude (Anthropic) integration
 - persistence implementations
 - external service clients
 

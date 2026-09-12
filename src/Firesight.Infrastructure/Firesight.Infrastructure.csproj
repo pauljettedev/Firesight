@@ -18,7 +18,7 @@
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" Version="10.0.3" />
-    <PackageReference Include="OpenAI" Version="2.13.0" />
+    <PackageReference Include="Anthropic" Version="12.47.0" />
   </ItemGroup>
 
   <PropertyGroup>

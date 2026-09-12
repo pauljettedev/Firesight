@@ -1,17 +1,17 @@
+using Anthropic;
 using Firesight.Application.AskFiresight;
 using Firesight.Application.Locations;
 using Firesight.Application.Wildfires;
+using Firesight.Infrastructure.Claude;
 using Firesight.Infrastructure.Cwfis;
 using Firesight.Infrastructure.HostedServices;
 using Firesight.Infrastructure.Nominatim;
-using Firesight.Infrastructure.OpenAI;
 using Firesight.Infrastructure.Persistence;
 using Firesight.Infrastructure.Wildfires;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using OpenAI.Responses;
 
 namespace Firesight.Infrastructure;
 
@@ -54,11 +54,11 @@ public static class DependencyInjection
                 "Nominatim:BaseUrl must be a valid absolute HTTP or HTTPS URL.")
             .ValidateOnStart();
 
-        services.AddOptions<OpenAiOptions>()
-            .Bind(configuration.GetSection(OpenAiOptions.SectionName))
+        services.AddOptions<ClaudeOptions>()
+            .Bind(configuration.GetSection(ClaudeOptions.SectionName))
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.Model),
-                "OpenAI:Model is required.")
+                "Claude:Model is required.")
             .ValidateOnStart();
 
         services.AddOptions<WildfireRetentionOptions>()
@@ -95,24 +95,23 @@ public static class DependencyInjection
                     new Uri("https://github.com/pauljettedev/Firesight");
             });
 
-#pragma warning disable OPENAI001
-        services.AddScoped(serviceProvider =>
+        services.AddSingleton(serviceProvider =>
         {
             var options = serviceProvider
-                .GetRequiredService<IOptions<OpenAiOptions>>()
+                .GetRequiredService<IOptions<ClaudeOptions>>()
                 .Value;
 
             if (string.IsNullOrWhiteSpace(options.ApiKey))
             {
                 throw new InvalidOperationException(
-                    "OpenAI:ApiKey is required to use Ask Firesight.");
+                    "Claude:ApiKey is required to use Ask Firesight.");
             }
 
-            return new ResponsesClient(apiKey: options.ApiKey);
+            return new AnthropicClient { ApiKey = options.ApiKey };
         });
-#pragma warning restore OPENAI001
 
-        services.AddScoped<IAskFiresightService, OpenAiAskFiresightService>();
+        services.AddSingleton<IClaudeMessagesClient, ClaudeMessagesClient>();
+        services.AddScoped<IAskFiresightService, ClaudeAskFiresightService>();
         services.AddScoped<IWildfireRepository, WildfireRepository>();
         services.AddScoped<IWildfireSyncStateRepository, WildfireSyncStateRepository>();
         services.AddScoped<DatabaseInitializer>();

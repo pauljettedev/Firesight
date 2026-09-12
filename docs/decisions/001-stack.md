@@ -20,7 +20,7 @@ Firesight will use a broad, industry-recognizable stack:
 - GitHub / GitHub Actions
 - Serilog
 - OpenAPI
-- OpenAI Responses API
+- Claude API (Anthropic)
 - MCP
 
 ## Context

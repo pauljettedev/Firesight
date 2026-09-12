@@ -43,11 +43,11 @@ For a low-cost demo environment, the database may also be designed to be reconst
 ## AI cost protection
 
 The hosted application should include:
-- server-side OpenAI API key
+- server-side Claude API key
 - application rate limiting
 - bounded prompt/input size
 - bounded output tokens
 - usage logging
 - project/account spending controls
 
-The interactive map should not require OpenAI calls. AI usage should occur only when a user explicitly invokes an AI feature.
+The interactive map should not require Claude calls. AI usage should occur only when a user explicitly invokes an AI feature.

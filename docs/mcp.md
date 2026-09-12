@@ -68,4 +68,4 @@ Unexpected exceptions are not rewritten with their internal exception text. The 
 - Prefer SDK-generated schemas except where an explicit interoperability constraint requires a portable MCP output schema.
 - The AI should answer from tool results rather than assumed model knowledge.
 - AI usage should be rate-limited in the public demo.
-- The OpenAI API key must remain server-side.
+- The Claude API key must remain server-side.

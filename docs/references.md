@@ -35,8 +35,7 @@ Use official documentation as the primary source when implementing Firesight.
 
 ## AI / MCP
 
-- OpenAI API: https://platform.openai.com/docs/
-- OpenAI Responses API: https://platform.openai.com/docs/api-reference/responses
+- Claude API (Anthropic): https://platform.claude.com/docs/
 - Model Context Protocol: https://modelcontextprotocol.io/
 
 ## Wildfire data

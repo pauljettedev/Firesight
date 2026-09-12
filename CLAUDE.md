@@ -49,9 +49,9 @@ Mcp ------------> Application
  +--------------> Infrastructure
 ```
 
-- **Firesight.Domain** — core models only (e.g. `Wildfire`). No EF Core, Npgsql, HTTP, OpenAI, or CWFIS references. Uses NetTopologySuite geometry types for spatial data.
-- **Firesight.Application** — use cases/orchestration (`WildfireService` etc.), DTOs, validation. Both the REST API and MCP tools must reuse this layer rather than duplicating business or spatial-query logic.
-- **Firesight.Infrastructure** — EF Core, Npgsql, PostGIS, CWFIS client, Nominatim geocoding, hosted sync background service, persistence implementations.
+- **Firesight.Domain** — core models only (e.g. `Wildfire`). No EF Core, Npgsql, HTTP, Claude/Anthropic, or CWFIS references. Uses NetTopologySuite geometry types for spatial data.
+- **Firesight.Application** — use cases/orchestration (`WildfireService`, `IAskFiresightService` etc.), DTOs, validation. Both the REST API and MCP tools must reuse this layer rather than duplicating business or spatial-query logic.
+- **Firesight.Infrastructure** — EF Core, Npgsql, PostGIS, CWFIS client, Nominatim geocoding, Claude (Anthropic) client for Ask Firesight, hosted sync background service, persistence implementations.
 - **Firesight.Api** — ASP.NET Core minimal API endpoints, DTO mapping, centralized error handling. Business logic must not live here.
 - **Firesight.Mcp** — MCP tool definitions that delegate to Application services; must not duplicate business/spatial logic or talk to the database directly.
 - **Firesight.Web** — React/TypeScript/MUI/MapLibre frontend; Vite proxies `/api` to the backend in dev.
@@ -76,6 +76,10 @@ Mcp ------------> Application
 ### MCP (see `docs/mcp.md`)
 
 MCP is a separate interface from the REST API but both call the same `Firesight.Application` services — never duplicate business/spatial logic in `Firesight.Mcp`. Production and the transport-level integration tests both register tools via the same `WithFiresightTools()` extension so the test host can't drift from production registration. Nullable output schema fields use explicit `anyOf` branches (not JSON Schema `["string","null"]` type arrays) for MCP client interoperability — this override is limited to the schema boundary and doesn't change application DTOs.
+
+### Ask Firesight (natural-language query feature)
+
+`ClaudeAskFiresightService` (`Firesight.Infrastructure/Claude`) implements `IAskFiresightService` using the Claude API (Messages API, tool use) — configured via the `Claude:Model`/`Claude:ApiKey` options (`ClaudeOptions`). It runs an agentic tool-call loop (max 4 rounds) over the same five Firesight tools MCP exposes (`geocode_location`, `get_active_wildfires`, `get_wildfire_by_external_id`, `find_wildfires_near_location`, `get_feed_sync_state`), calling straight through to `IWildfireService`/`ILocationGeocoder` — never the database directly. For count/exists/status questions, the *application code* computes the deterministic answer from tool output rather than trusting the model to count or state status itself; the model's role is limited to picking the right tool and `responseMode`. `AnthropicClient` is registered as a singleton in DI (it's a stateless, thread-safe API client — do not switch it back to scoped/per-request).
 
 ## Documentation map
 
