@@ -44,6 +44,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.MapAskFiresightEndpoints();
 app.MapHealthEndpoints();
 app.MapLocationEndpoints();
 app.MapWildfireEndpoints();

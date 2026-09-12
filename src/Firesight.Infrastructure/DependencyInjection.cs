@@ -1,14 +1,17 @@
+using Firesight.Application.AskFiresight;
 using Firesight.Application.Locations;
 using Firesight.Application.Wildfires;
 using Firesight.Infrastructure.Cwfis;
 using Firesight.Infrastructure.HostedServices;
 using Firesight.Infrastructure.Nominatim;
+using Firesight.Infrastructure.OpenAI;
 using Firesight.Infrastructure.Persistence;
 using Firesight.Infrastructure.Wildfires;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenAI.Responses;
 
 namespace Firesight.Infrastructure;
 
@@ -51,6 +54,13 @@ public static class DependencyInjection
                 "Nominatim:BaseUrl must be a valid absolute HTTP or HTTPS URL.")
             .ValidateOnStart();
 
+        services.AddOptions<OpenAiOptions>()
+            .Bind(configuration.GetSection(OpenAiOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.Model),
+                "OpenAI:Model is required.")
+            .ValidateOnStart();
+
         services.AddOptions<WildfireRetentionOptions>()
             .Bind(configuration.GetSection(WildfireRetentionOptions.SectionName))
             .Validate(
@@ -85,6 +95,24 @@ public static class DependencyInjection
                     new Uri("https://github.com/pauljettedev/Firesight");
             });
 
+#pragma warning disable OPENAI001
+        services.AddScoped(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<OpenAiOptions>>()
+                .Value;
+
+            if (string.IsNullOrWhiteSpace(options.ApiKey))
+            {
+                throw new InvalidOperationException(
+                    "OpenAI:ApiKey is required to use Ask Firesight.");
+            }
+
+            return new ResponsesClient(apiKey: options.ApiKey);
+        });
+#pragma warning restore OPENAI001
+
+        services.AddScoped<IAskFiresightService, OpenAiAskFiresightService>();
         services.AddScoped<IWildfireRepository, WildfireRepository>();
         services.AddScoped<IWildfireSyncStateRepository, WildfireSyncStateRepository>();
         services.AddScoped<DatabaseInitializer>();
