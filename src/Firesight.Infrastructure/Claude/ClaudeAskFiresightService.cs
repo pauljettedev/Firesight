@@ -14,6 +14,15 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     private const int MaxToolRounds = 4;
     private const int MaxResponseTokens = 8000;
 
+    // Without Tool.Strict (see the tool definitions below), Claude's "status"
+    // argument is no longer guaranteed to be one of these exact CWFIS codes —
+    // it's just whatever text the model produced. GetStatusFilter rejects
+    // anything else as an ApplicationValidationException (same as a bad
+    // radius) so the model sees the failure and can retry or explain, rather
+    // than the request silently answering a different, unfiltered question.
+    private static readonly HashSet<string> ValidStatusCodes =
+        new(StringComparer.OrdinalIgnoreCase) { "OC", "BH", "UC", "EX" };
+
     private const string SystemInstructions =
         """
         You are Ask Firesight, an assistant for the Firesight Canadian wildfire demo.
@@ -54,11 +63,17 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
+    // None of the five tools below set Tool.Strict — do not add it to any of
+    // them. Claude's API rejects a strict tool unless its schema also sets
+    // "additionalProperties": false, but the Anthropic C# SDK's InputSchema
+    // type (confirmed via its compiled metadata) only exposes
+    // Type/Properties/Required — there's no way to set that flag through this
+    // typed builder. Strict + this InputSchema shape is a 400 at the API,
+    // every time, not just a style choice.
     private static readonly Tool GeocodeLocationTool = new()
     {
         Name = "geocode_location",
         Description = "Resolve a Canadian town or city name to latitude and longitude.",
-        Strict = true,
         InputSchema = new()
         {
             Properties = new Dictionary<string, JsonElement>
@@ -79,7 +94,6 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     {
         Name = "get_active_wildfires",
         Description = "Query current Firesight wildfire records. Use status and responseMode to express simple factual intent.",
-        Strict = true,
         InputSchema = new()
         {
             Properties = new Dictionary<string, JsonElement>
@@ -109,7 +123,6 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     {
         Name = "get_wildfire_by_external_id",
         Description = "Return a current wildfire by its CWFIS national fire identifier.",
-        Strict = true,
         InputSchema = new()
         {
             Properties = new Dictionary<string, JsonElement>
@@ -138,7 +151,6 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     {
         Name = "find_wildfires_near_location",
         Description = "Find current Firesight wildfire records within a radius of a latitude and longitude, ordered nearest first.",
-        Strict = true,
         InputSchema = new()
         {
             Properties = new Dictionary<string, JsonElement>
@@ -189,7 +201,6 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     {
         Name = "get_feed_sync_state",
         Description = "Return Firesight dataset synchronization state, including the last successful fetch time.",
-        Strict = true,
         InputSchema = new()
         {
             Properties = new Dictionary<string, JsonElement>(),
@@ -407,7 +418,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
 
                 case "get_active_wildfires":
                 {
-                    var status = GetOptionalString(input, "status");
+                    var status = GetStatusFilter(input);
                     var responseMode = GetString(input, "responseMode");
                     var result = await wildfireService.GetActiveWildfiresAsync(
                         cancellationToken);
@@ -437,7 +448,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     var latitude = GetDouble(input, "latitude");
                     var longitude = GetDouble(input, "longitude");
                     var radiusKm = GetDouble(input, "radiusKm");
-                    var status = GetOptionalString(input, "status");
+                    var status = GetStatusFilter(input);
                     var responseMode = GetString(input, "responseMode");
 
                     var result = await wildfireService.FindWildfiresNearAsync(
@@ -594,6 +605,25 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         }
 
         return element.GetString();
+    }
+
+    private static string? GetStatusFilter(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var status = GetOptionalString(input, "status");
+
+        if (status is not null && !ValidStatusCodes.Contains(status))
+        {
+            throw new ApplicationValidationException(
+                new Dictionary<string, string[]>
+                {
+                    ["status"] =
+                    [
+                        $"'{status}' is not a recognized CWFIS stage-of-control code. Use OC, BH, UC, or EX, or omit status entirely."
+                    ]
+                });
+        }
+
+        return status;
     }
 
     private static int CountByStatus(

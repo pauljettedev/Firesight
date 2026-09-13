@@ -59,6 +59,42 @@ public sealed class ClaudeAskFiresightServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_RejectsUnrecognizedStatusAsValidationErrorToModel()
+    {
+        // Without Tool.Strict, "status" isn't guaranteed to be one of the real
+        // CWFIS codes — this simulates Claude sending something else instead
+        // of "OC". Rather than silently answering a different (unfiltered)
+        // question, this is reported back to the model as a validation
+        // failure, same as a bad radius value, so the model can retry or
+        // explain to the user instead of the app guessing on its behalf.
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "get_active_wildfires",
+                """{"status":"Out of Control","responseMode":"count"}"""),
+            CreateAnswerResponse(
+                "I couldn't recognize that status, so here's the total count instead."));
+
+        var service = CreateService(
+            client.Object,
+            Mock.Of<IWildfireService>(),
+            Mock.Of<ILocationGeocoder>());
+
+        var result = await service.AskAsync(
+            "How many out of control wildfires are there?");
+
+        Assert.Equal(
+            "I couldn't recognize that status, so here's the total count instead.",
+            result.Answer);
+
+        client.Verify(
+            messagesClient => messagesClient.CreateAsync(
+                It.IsAny<MessageCreateParams>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
     public async Task AskAsync_ReturnsDeterministicStatusCountForLocationSearch()
     {
         var client = CreateClient(
