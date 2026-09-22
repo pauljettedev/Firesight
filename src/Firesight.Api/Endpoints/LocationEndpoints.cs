@@ -8,8 +8,9 @@ public static class LocationEndpoints
     public static IEndpointRouteBuilder MapLocationEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        // Policy defined in Program.cs — protects Nominatim from abuse via
-        // this API, not our own costs (see rate limiter comment there).
+        // The rate limit policy is defined in Program.cs. It protects
+        // Nominatim from abuse through this API, not our own costs.
+        // See the comment next to that policy for more detail.
         var group = endpoints.MapGroup("/api/locations")
             .WithTags("Locations")
             .RequireRateLimiting("Geocode");

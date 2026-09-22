@@ -81,6 +81,11 @@ export function WildfireMap({
   const mapSelectedWildfireIdRef = useRef<string | null>(null)
   const hadFocusAreaRef = useRef(false)
 
+  // The map below is created once and its click handler is set up only
+  // that one time. These three effects keep the refs updated so that
+  // handler can always read the latest wildfires, selection, and
+  // onWildfireSelect, without us having to rebuild the whole map every
+  // time those props change.
   useEffect(() => {
     wildfiresRef.current = wildfires
   }, [wildfires])
@@ -335,6 +340,9 @@ export function WildfireMap({
 
     hadFocusAreaRef.current = true
 
+    // 1 degree of latitude is about 111 km, so dividing by 111 turns our
+    // radius into degrees. A degree of longitude covers less distance as
+    // you move away from the equator, so we shrink it using cos(latitude).
     const latitudeDelta = focusArea.radiusKm / 111
     const longitudeScale = Math.max(
       Math.cos((focusArea.latitude * Math.PI) / 180),

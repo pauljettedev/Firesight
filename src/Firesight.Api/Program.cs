@@ -13,14 +13,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    // A hosted deployment (container platform, reverse proxy, load balancer)
-    // sits in front of this app, so without this, every request's
-    // RemoteIpAddress would be the proxy's IP, not the visitor's — collapsing
-    // the per-client rate limit below into one shared budget for everyone.
-    // KnownIPNetworks/KnownProxies are cleared because the exact proxy address
-    // isn't fixed ahead of time on most hosting platforms; this is a standard
-    // trade-off for a cost-protection limiter on a low-stakes public demo,
-    // not something guarding anything security-sensitive.
+    // When this app runs behind a proxy or load balancer, every request looks
+    // like it comes from the proxy's own IP address, not the real visitor's.
+    // That would break the rate limits below, since every visitor would end
+    // up sharing one limit instead of getting their own.
+    // We clear KnownIPNetworks and KnownProxies because we don't know the
+    // exact proxy address ahead of time on most hosting platforms.
+    // That's fine here, because this limit only exists to control cost on a
+    // small demo. It isn't guarding anything sensitive.
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
@@ -29,9 +29,9 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // AI calls cost real money per request, unlike the rest of the API — cap
-    // per-IP usage so a single client can't run up the Claude API bill on this
-    // public demo.
+    // AI calls cost real money per request, unlike the rest of the API.
+    // We limit each visitor's IP address so one person can't run up our
+    // Claude API bill on this public demo.
     options.AddPolicy("AskFiresight", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -42,10 +42,11 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
-    // Geocoding proxies to Nominatim's free public instance, which has its
-    // own usage policy — a client hammering this endpoint doesn't cost us
-    // money directly, but it can get our server's IP rate-limited or banned
-    // by Nominatim for everyone using the app, not just the abusive client.
+    // Geocoding sends requests to Nominatim's free public service, which has
+    // its own usage rules. A visitor hammering this endpoint doesn't cost us
+    // money directly. But it can get our server rate-limited or blocked by
+    // Nominatim, which would break the search for every user of this app,
+    // not just the one making too many requests.
     options.AddPolicy("Geocode", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",

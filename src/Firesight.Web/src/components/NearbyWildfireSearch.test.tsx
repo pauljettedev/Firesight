@@ -41,10 +41,10 @@ describe('NearbyWildfireSearch', () => {
   const onSelect = vi.fn()
 
   beforeEach(() => {
-    // Both service mocks and the onSelect spy are shared across tests in
-    // this file (vi.mock is module-scoped, not per-test) — without this,
-    // one test's mockResolvedValue or recorded calls would leak into the
-    // next test's assertions.
+    // The service mocks and the onSelect spy are shared across every test
+    // in this file. vi.mock only sets them up once per file, not once per test.
+    // Without this line, one test's mockResolvedValue or recorded calls would
+    // carry over into the next test's checks.
     vi.clearAllMocks()
   })
 
@@ -108,14 +108,15 @@ describe('NearbyWildfireSearch', () => {
     // as a number, not the string the TextField stores it as.
     expect(mockedGetNearbyWildfires).toHaveBeenCalledWith(45.4215, -75.6972, 25)
 
-    // The location caption alone doesn't prove a fire card actually rendered
-    // — check the formatted details a user is there to see. Area uses the
-    // same locale-sensitive toLocaleString() as formatArea's own test (see
-    // wildfirePresentation.test.ts), so it gets the same digit-stripping
-    // treatment rather than an exact-string match. Distance stays under 10 km
-    // deliberately, since formatDistance() only switches to toLocaleString()
-    // at 10 km and above — under that, it's plain toFixed(1), which has no
-    // locale dependence to work around.
+    // The location caption alone doesn't prove a fire card actually rendered.
+    // So we also check the formatted details a user is there to see.
+    // Area uses the same locale-sensitive toLocaleString() as formatArea's
+    // own test (see wildfirePresentation.test.ts), so we check it the same
+    // way, by stripping out everything except digits instead of matching an
+    // exact string.
+    // Distance is kept under 10 km on purpose. formatDistance() only switches
+    // to toLocaleString() at 10 km and above. Below that it just uses
+    // toFixed(1), which has no locale dependence to worry about.
     expect(screen.getByText('Out of Control')).toBeInTheDocument()
     expect(screen.getByText('4.2 km')).toBeInTheDocument()
     const areaText = screen.getByText(/ha$/)

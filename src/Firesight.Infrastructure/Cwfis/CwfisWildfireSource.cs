@@ -153,9 +153,9 @@ public sealed class CwfisWildfireSource(
 
         var agency = GetString(properties, "agency_code") ?? "Unknown";
 
-        // CWFIS uses -1 as a "not reported" sentinel on fire_size (confirmed live,
-        // ~1.6% of rows) — treat it as unknown rather than a literal negative area,
-        // or it ends up displayed as "-1 ha" in the UI.
+        // CWFIS uses -1 to mean "not reported" for fire_size. We saw this in
+        // about 1.6% of real rows. We treat it as unknown, not as an actual
+        // negative area, or it would show up as "-1 ha" in the app.
         var area = GetDouble(properties, "fire_size");
         if (area is < 0)
         {

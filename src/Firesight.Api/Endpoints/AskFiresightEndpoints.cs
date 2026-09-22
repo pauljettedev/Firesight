@@ -10,8 +10,9 @@ public static class AskFiresightEndpoints
     public static IEndpointRouteBuilder MapAskFiresightEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        // Caps requests per IP (policy defined in Program.cs) — AI calls cost
-        // real money per request, so this is the one endpoint that needs it.
+        // Limits requests per IP address. The policy is defined in Program.cs.
+        // AI calls cost real money per request, so this is the one endpoint
+        // that needs a limit.
         var group = endpoints.MapGroup("/api/ask")
             .WithTags("Ask Firesight")
             .RequireRateLimiting("AskFiresight");

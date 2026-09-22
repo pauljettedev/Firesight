@@ -81,12 +81,8 @@ public sealed class WildfireRepository(
                 (fire.Status != "EX" ||
                  fire.FirstObservedExtinguishedUtc == null ||
                  fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc) &&
-
-                // Use PostGIS spatial filtering for the search radius.
                 fire.Location.IsWithinDistance(origin, radiusMeters))
-            .OrderBy(fire =>
-                // Sort nearest fire first.
-                fire.Location.Distance(origin))
+            .OrderBy(fire => fire.Location.Distance(origin))
             .Select(fire => new
             {
                 Wildfire = fire,

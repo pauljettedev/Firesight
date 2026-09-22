@@ -7,6 +7,8 @@ public sealed class WildfireService(
     IWildfireRepository repository,
     IWildfireSyncStateRepository syncStateRepository) : IWildfireService
 {
+    // Stops two overlapping syncs (for example a manual trigger during the
+    // hourly background sync) from writing to the same rows at once.
     private static readonly SemaphoreSlim RefreshLock = new(1, 1);
 
     public Task<IReadOnlyList<WildfireDto>> GetActiveWildfiresAsync(

@@ -21,8 +21,8 @@ describe('stageOfControlLabel', () => {
   })
 
   it('falls back to the original code as-given for an unrecognized status', () => {
-    // Unlike the known-code path above, the fallback does not re-case the
-    // input — it returns whatever was passed in verbatim.
+    // Unlike the known-code path above, the fallback does not change the
+    // case of the input. It returns exactly what was passed in.
     expect(stageOfControlLabel('zz')).toBe('zz')
   })
 
@@ -33,11 +33,11 @@ describe('stageOfControlLabel', () => {
 
 describe('formatArea', () => {
   it('formats a number with a unit, using whatever grouping the runtime locale applies', () => {
-    // toLocaleString() output depends on the runner's locale (comma vs.
-    // period vs. space as the thousands separator, or none at all) — same
-    // portability trap as formatTimestamp below. Stripping non-digits before
-    // comparing still proves grouping ran on the right number, without
-    // hardcoding one locale's separator.
+    // toLocaleString() output depends on the runner's locale. The thousands
+    // separator could be a comma, a period, a space, or nothing at all.
+    // This is the same problem formatTimestamp has below.
+    // Stripping out everything except digits before comparing still proves
+    // the right number was formatted, without assuming one locale's separator.
     const result = formatArea(1234)
     expect(result.endsWith(' ha')).toBe(true)
     expect(result.replace(/\D/g, '')).toBe('1234')
@@ -62,9 +62,10 @@ describe('formatTimestamp', () => {
   })
 
   it('formats a valid timestamp instead of falling into an error branch', () => {
-    // toLocaleString() output depends on the test runner's locale/timezone,
-    // so assert the success path was taken rather than an exact string —
-    // an exact match here would be a portability trap across machines/CI.
+    // toLocaleString() output depends on the test runner's locale and time zone.
+    // So instead of checking for an exact string, we just check that the
+    // success path was taken. An exact match here would break on a different
+    // machine or in CI.
     const result = formatTimestamp('2026-01-15T12:00:00Z')
     expect(result).not.toBe('Invalid timestamp')
     expect(result).not.toBe('Not provided')

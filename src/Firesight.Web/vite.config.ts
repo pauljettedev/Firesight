@@ -1,5 +1,6 @@
-// vitest/config re-exports vite's defineConfig with the `test` option typed —
-// this file still configures the Vite dev/build behavior below unchanged.
+// vitest/config gives us the same defineConfig as vite, but with the
+// `test` option added. Everything below still configures Vite the same
+// way it did before.
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 

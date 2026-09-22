@@ -17,6 +17,9 @@ public sealed class ApiExceptionHandler(
         Exception exception,
         CancellationToken cancellationToken)
     {
+        // The client gave up and disconnected before we finished. That's not
+        // our error, so we return 499 instead of 500. This keeps it out of
+        // our error logs, where a 500 usually means something is actually broken.
         if (exception is OperationCanceledException &&
             httpContext.RequestAborted.IsCancellationRequested)
         {

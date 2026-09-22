@@ -14,12 +14,13 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     private const int MaxToolRounds = 4;
     private const int MaxResponseTokens = 8000;
 
-    // Without Tool.Strict (see the tool definitions below), Claude's "status"
-    // argument is no longer guaranteed to be one of these exact CWFIS codes —
-    // it's just whatever text the model produced. GetStatusFilter rejects
-    // anything else as an ApplicationValidationException (same as a bad
-    // radius) so the model sees the failure and can retry or explain, rather
-    // than the request silently answering a different, unfiltered question.
+    // The tools below don't use Tool.Strict (see the note further down), so
+    // Claude's "status" argument is not guaranteed to be one of these exact
+    // CWFIS codes. It could be any text the model made up.
+    // GetStatusFilter rejects anything else with an ApplicationValidationException,
+    // the same way it rejects a bad radius. This way Claude sees the problem
+    // and can retry or explain it, instead of the app silently answering a
+    // different question than the one the user asked.
     private static readonly HashSet<string> ValidStatusCodes =
         new(StringComparer.OrdinalIgnoreCase) { "OC", "BH", "UC", "EX" };
 
@@ -63,13 +64,11 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
-    // None of the five tools below set Tool.Strict — do not add it to any of
-    // them. Claude's API rejects a strict tool unless its schema also sets
-    // "additionalProperties": false, but the Anthropic C# SDK's InputSchema
-    // type (confirmed via its compiled metadata) only exposes
-    // Type/Properties/Required — there's no way to set that flag through this
-    // typed builder. Strict + this InputSchema shape is a 400 at the API,
-    // every time, not just a style choice.
+    // Do not turn on Tool.Strict for any of the five tools below.
+    // Claude requires "additionalProperties": false on a strict tool's schema,
+    // and the C# library we use here has no way to set that.
+    // Turning Strict on would make every call fail with a 400 error, every
+    // time. This isn't a style choice, it's a hard requirement.
     private static readonly Tool GeocodeLocationTool = new()
     {
         Name = "geocode_location",
@@ -248,8 +247,9 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         // answers with plain text instead of a tool call, or we hit MaxToolRounds.
         for (var round = 0; round < MaxToolRounds; round++)
         {
-            // Send the whole conversation so far (messages), not just the new bit —
-            // Claude has no memory between calls, so we resend everything every round.
+            // We send the whole conversation so far, not just the newest message.
+            // Claude doesn't remember anything between calls, so we have to resend
+            // everything each round.
             var parameters = new MessageCreateParams
             {
                 Model = model,
@@ -340,15 +340,17 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     lastGeocodedLocation = execution.GeocodedLocation;
                 }
 
-                // Always overwrite, even with null: a tool call that isn't a location
-                // search means the conversation has moved on, so any earlier round's
-                // map location should stop applying — otherwise it can leak into a
-                // later, unrelated answer (including the plain-text final answer).
+                // Always overwrite this, even with null. If the tool Claude just called
+                // isn't a location search, the conversation has moved on to something
+                // else. Any map location from an earlier round should stop applying now.
+                // Otherwise it could leak into a later answer that has nothing to do
+                // with that location, including the final text answer.
                 mapContext = execution.MapContext;
 
-                // For count/exists/status questions, WE compute the answer from the
-                // tool's real data instead of asking Claude to say it — if we can,
-                // skip the rest of the loop and return right now.
+                // For count, exists, and status questions, our own code works out the
+                // answer from the tool's real data. We don't let Claude state it itself.
+                // If we can compute the answer here, we skip the rest of the loop and
+                // return right away.
                 var deterministicAnswer = TryCreateDeterministicAnswer(
                     execution,
                     toolsUsed,
@@ -503,17 +505,17 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // A dependency (e.g. Nominatim) failing transiently shouldn't crash the
-            // whole /api/ask request — report it back to the model as a tool error
-            // instead, same as a validation failure, so the conversation can continue
-            // or degrade gracefully. Log it ourselves since swallowing it here means
-            // ApiExceptionHandler never sees it to log it for us.
+            // A dependency like Nominatim can fail for a moment without the app
+            // being broken. We don't want that to crash the whole /api/ask
+            // request, so we report it back to Claude as a tool error instead,
+            // the same as a validation failure. We log it here too, since
+            // ApiExceptionHandler never sees this exception once we catch it.
             //
-            // Guarding on cancellationToken.IsCancellationRequested rather than the
-            // exception's type matters here: an HttpClient timeout inside a tool call
-            // throws TaskCanceledException, which IS an OperationCanceledException —
-            // excluding that type entirely would let a plain network timeout slip
-            // past this handler uncaught, the exact failure this fix exists for.
+            // We check cancellationToken.IsCancellationRequested instead of the
+            // exception type, because a network timeout throws
+            // TaskCanceledException, which also counts as an
+            // OperationCanceledException. Excluding that whole type would also
+            // hide real timeouts, which is exactly the failure this check is for.
             logger.LogWarning(
                 exception,
                 "Ask Firesight tool '{ToolName}' failed.",
@@ -555,9 +557,10 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     execution.Wildfires,
                     execution.RequestedStatus);
 
-                // Dataset-wide count is never location-scoped — pass null rather
-                // than an earlier round's mapContext, which could be from an
-                // unrelated location search earlier in this same conversation.
+                // A count across the whole dataset is never tied to one location.
+                // We pass null here instead of reusing an earlier round's mapContext,
+                // which could be left over from an unrelated location search earlier
+                // in this same conversation.
                 return new AskFiresightResult(
                     FormatCountAnswer(
                         count,
