@@ -30,7 +30,7 @@ jobs:
         run: dotnet test Firesight.slnx --configuration Release --no-build
 
   frontend:
-    name: Frontend lint and build
+    name: Frontend lint, test, and build
     runs-on: ubuntu-latest
 
     defaults:
@@ -53,6 +53,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm run test
 
       - name: Build
         run: npm run build
