@@ -41,6 +41,20 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+
+    // Geocoding proxies to Nominatim's free public instance, which has its
+    // own usage policy — a client hammering this endpoint doesn't cost us
+    // money directly, but it can get our server's IP rate-limited or banned
+    // by Nominatim for everyone using the app, not just the abusive client.
+    options.AddPolicy("Geocode", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 builder.Services.AddProblemDetails(options =>
 {

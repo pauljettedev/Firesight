@@ -1,4 +1,5 @@
 using Firesight.Application.Locations;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Firesight.Api.Endpoints;
 
@@ -7,8 +8,11 @@ public static class LocationEndpoints
     public static IEndpointRouteBuilder MapLocationEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
+        // Policy defined in Program.cs — protects Nominatim from abuse via
+        // this API, not our own costs (see rate limiter comment there).
         var group = endpoints.MapGroup("/api/locations")
-            .WithTags("Locations");
+            .WithTags("Locations")
+            .RequireRateLimiting("Geocode");
 
         group.MapGet("/geocode", async (
             string query,
