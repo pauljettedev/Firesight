@@ -172,7 +172,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     """
                     {
                       "type": "number",
-                      "description": "Search radius in kilometres. Must be greater than zero."
+                      "description": "Search radius in kilometres. Must be greater than zero and at most 1000."
                     }
                     """),
                 ["status"] = Schema(

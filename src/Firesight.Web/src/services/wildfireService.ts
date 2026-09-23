@@ -51,10 +51,37 @@ export async function getNearbyWildfires(
   const response = await fetch(`/api/wildfires/near?${query}`)
 
   if (!response.ok) {
-    throw new Error(`Nearby wildfire request failed: ${response.status}`)
+    throw new Error(
+      await describeError(response, 'Nearby wildfire request failed'),
+    )
   }
 
   return response.json()
+}
+
+// A failed request like a bad radius comes back with a JSON body explaining
+// what was wrong, for example "Radius must be at most 1000 km." We read that
+// instead of just showing a status code, so the user knows what to fix.
+async function describeError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body = await response.json()
+    const messages = Object.values(body.errors ?? {}).flat()
+
+    if (messages.length > 0) {
+      return messages.join(' ')
+    }
+
+    if (typeof body.title === 'string') {
+      return body.title
+    }
+  } catch {
+    // The response body wasn't JSON, or didn't have the shape we expected.
+  }
+
+  return `${fallback}: ${response.status}`
 }
 
 export async function getWildfireSyncState(): Promise<WildfireFeedSyncState | null> {
