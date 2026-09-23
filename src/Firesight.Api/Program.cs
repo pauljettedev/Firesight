@@ -93,6 +93,13 @@ app.UseRateLimiter();
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
+
+    // In production this container serves the built React app itself (see the
+    // root Dockerfile), so the frontend and API share one origin. In
+    // development the Vite dev server serves the frontend instead, and
+    // wwwroot doesn't exist.
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
 }
 
 app.MapAskFiresightEndpoints();
@@ -100,5 +107,10 @@ app.MapHealthEndpoints();
 app.MapLocationEndpoints();
 app.MapWildfireEndpoints();
 app.MapMcp("/mcp");
+
+if (!app.Environment.IsDevelopment())
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();

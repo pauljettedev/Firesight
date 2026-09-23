@@ -1,0 +1,46 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: firesight-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firesight-app
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__FiresightDatabase: "Host=postgres;Port=5432;Database=firesight;Username=firesight;Password=${POSTGRES_PASSWORD}"
+      Claude__ApiKey: ${CLAUDE_API_KEY}
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: firesight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: firesight
+      POSTGRES_USER: firesight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - firesight-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  firesight-postgres-data:
+  caddy-data:
+  caddy-config:
