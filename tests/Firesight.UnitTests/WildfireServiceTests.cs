@@ -161,6 +161,7 @@ public sealed class WildfireServiceTests
     [InlineData(0, 181, 10, "longitude")]
     [InlineData(0, 0, 0, "radiusKm")]
     [InlineData(0, 0, -1, "radiusKm")]
+    [InlineData(0, 0, 1_001, "radiusKm")]
     [InlineData(double.NaN, 0, 10, "latitude")]
     [InlineData(double.PositiveInfinity, 0, 10, "latitude")]
     [InlineData(0, double.NaN, 10, "longitude")]

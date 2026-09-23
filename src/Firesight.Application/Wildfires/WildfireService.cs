@@ -11,6 +11,13 @@ public sealed class WildfireService(
     // hourly background sync) from writing to the same rows at once.
     private static readonly SemaphoreSlim RefreshLock = new(1, 1);
 
+    // The app's own "near me" default (see Ask Firesight's system prompt) is
+    // 200 km. 1,000 km is 5x that, generous enough to cover a search across
+    // most of a large province, but still small enough to stop a client from
+    // sending a huge or accidental radius that forces PostGIS to scan way
+    // more of the map than any real "nearby" search needs.
+    private const double MaxRadiusKm = 1_000;
+
     public Task<IReadOnlyList<WildfireDto>> GetActiveWildfiresAsync(
         CancellationToken cancellationToken = default) =>
         repository.GetAllAsync(cancellationToken);
@@ -40,10 +47,10 @@ public sealed class WildfireService(
                 ["Longitude must be a finite value between -180 and 180."];
         }
 
-        if (!double.IsFinite(radiusKm) || radiusKm <= 0)
+        if (!double.IsFinite(radiusKm) || radiusKm <= 0 || radiusKm > MaxRadiusKm)
         {
             errors[nameof(radiusKm)] =
-                ["Radius must be a finite value greater than 0."];
+                [$"Radius must be a finite value greater than 0 and at most {MaxRadiusKm} km."];
         }
 
         if (errors.Count > 0)
