@@ -130,6 +130,14 @@ Applied pending OS updates before installing anything else:
 sudo apt update && sudo apt upgrade -y
 ```
 
+**Important:** partway through, this prompted with a config-file conflict for
+`/etc/ssh/sshd_config`, asking whether to install the package maintainer's default version or
+keep the locally modified one. **Kept the local version** (the prompt's default option) —
+DigitalOcean customizes this file on droplet creation (SSH key access, cloud-specific settings),
+and overwriting it with the plain Ubuntu default risks undoing those customizations, potentially
+breaking the SSH access that's currently working. If this prompt reappears on a future update,
+keep the local version again unless there's a specific, understood reason to change it.
+
 ### Installing Docker + the Compose plugin
 
 Docker's official install method for Ubuntu, step by step:
@@ -171,6 +179,22 @@ Verified the install:
 sudo docker run hello-world
 ```
 
+A short test image download-and-run — it just proves Docker actually works end-to-end
+before trusting it with the real app.
+
+## 6. Clone the repository
+
+```
+git clone https://github.com/pauljettedev/Firesight.git
+cd Firesight
+```
+
+This downloads a copy of the codebase onto the droplet itself — the droplet needs its own copy
+on disk because that's where the `Dockerfile`, `docker-compose.prod.yml`, and `Caddyfile` it's
+about to build and run actually live. This clones whatever is currently on `main`, so `main`
+needs to already contain the production deployment files (Dockerfile, compose file, Caddyfile,
+`.env.example`) before this step will produce a working setup.
+
 ---
 
 ## Progress so far
@@ -181,7 +205,7 @@ sudo docker run hello-world
 - [x] DNS A records pointing `codewheel.ca` / `www.codewheel.ca` at the droplet
 - [x] Logged into the droplet, OS updated
 - [x] Docker + Compose plugin installed and verified
-- [ ] Clone the repository onto the droplet
+- [x] Repository cloned onto the droplet
 - [ ] Set up `.env` with real secrets
 - [ ] `docker compose -f docker-compose.prod.yml up -d --build`
 - [ ] Confirm the site loads over HTTPS
