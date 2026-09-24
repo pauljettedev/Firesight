@@ -8,9 +8,18 @@ import type {
   Map as MapLibreMap,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import './WildfireMap.css'
 import type { Wildfire } from '../services/wildfireService'
 import { WildfirePopup } from './WildfirePopup'
+
+// MapLibre works out its worker script's URL at runtime by guessing it sits
+// next to whichever bundle chunk is currently executing (see maplibre-gl's
+// internal getWorkerUrl()). Vite doesn't know to emit that file there on its
+// own, so the guess 404s in production. Importing it with `?url` makes Vite
+// bundle the real worker file and hand back its actual built URL, which we
+// hand to MapLibre directly instead of letting it guess.
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 export interface WildfireMapFocusArea {
   latitude: number
