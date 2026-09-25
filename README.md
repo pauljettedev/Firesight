@@ -4,6 +4,8 @@ A map of current Canadian wildfires, built as a portfolio project. It pulls live
 the Canadian Wildland Fire Information System (CWFIS), stores it in PostgreSQL/PostGIS, and
 serves it through a React map, a REST API, and MCP tools.
 
+**Live:** https://firesight.codewheel.ca
+
 It is a demo, not an official wildfire service. See the [disclaimer](#disclaimer).
 
 ## Features

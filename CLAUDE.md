@@ -92,5 +92,5 @@ Docs should stay short and plain, and say each thing in one place (link instead 
 - `docs/data-sources.md` — CWFIS ingestion, schema mapping, freshness semantics
 - `docs/cwfis-historical-reference.md` — CWFIS historical/time-series data (`cwfif_national_reportedfires`, NBAC), for a not-yet-built historical-query feature; live-verified field schema, query syntax, and a recommendation to query live rather than store a local historical copy
 - `docs/mcp.md` — MCP tool contracts and design rules
-- `docs/deployment.md`, `docs/server-setup-walkthrough.md` — production hosting
-- `docs/decisions/*.md` — ADRs, indexed in `docs/decisions/README.md` (stack, CWFIS, PostGIS, freshness, layering, UI components, Ask Firesight, testing, API errors)
+- `docs/deployment.md`, `docs/server-setup-walkthrough.md` — production hosting (Firesight runs at firesight.codewheel.ca; Caddy/HTTPS lives in the separate `codewheel` repo, and the app joins its external `codewheel` Docker network)
+- `docs/decisions/*.md` — ADRs, indexed in `docs/decisions/README.md` (stack, CWFIS, PostGIS, freshness, layering, UI components, Ask Firesight, testing, API errors, hosting)

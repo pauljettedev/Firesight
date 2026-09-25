@@ -14,3 +14,4 @@ means for the code.
 | [007](007-ask-firesight.md) | Ask Firesight: the AI picks the query, the code gives the answer |
 | [008](008-testing.md) | Test against a real database |
 | [009](009-api-errors.md) | Only explicit validation errors are client errors |
+| [010](010-hosting.md) | Hosting on a subdomain behind a shared Caddy |

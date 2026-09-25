@@ -1,24 +1,12 @@
-services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: firesight-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - app
+# Production stack for firesight.codewheel.ca. HTTPS is handled by the shared
+# Caddy in the codewheel repo; Postgres stays on this project's private network.
 
+services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    # The codewheel Caddyfile reaches the app by this name. Rename both together.
     container_name: firesight-app
     restart: unless-stopped
     environment:
@@ -28,6 +16,9 @@ services:
       Claude__ApiKey: ${CLAUDE_API_KEY}
     depends_on:
       - postgres
+    networks:
+      - default
+      - codewheel
 
   postgres:
     image: postgis/postgis:16-3.4
@@ -40,7 +31,10 @@ services:
     volumes:
       - firesight-postgres-data:/var/lib/postgresql/data
 
+networks:
+  # Created once on the server with `docker network create codewheel`.
+  codewheel:
+    external: true
+
 volumes:
   firesight-postgres-data:
-  caddy-data:
-  caddy-config:

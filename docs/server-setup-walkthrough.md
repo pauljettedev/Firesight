@@ -1,5 +1,10 @@
 # Server Setup Walkthrough
 
+> **Note:** this records the original setup, where Firesight owned the whole domain and ran its
+> own Caddy. Firesight has since moved to `firesight.codewheel.ca`, with Caddy in the separate
+> codewheel repo ([ADR 010](decisions/010-hosting.md)). For current steps, see
+> [deployment.md](deployment.md).
+
 A plain-language, click-by-click record of standing up the Firesight production server from
 scratch. `deployment.md` is the terse technical reference (what to do); this document is the
 fuller walkthrough (what each step actually means and why), for anyone who hasn't set up a
