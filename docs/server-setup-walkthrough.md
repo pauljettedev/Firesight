@@ -195,6 +195,107 @@ about to build and run actually live. This clones whatever is currently on `main
 needs to already contain the production deployment files (Dockerfile, compose file, Caddyfile,
 `.env.example`) before this step will produce a working setup.
 
+## 7. Create the `.env` file
+
+The app needs a few private settings (a database password, the Claude API key, the domain
+name) that must never be stored in Git. They live in a file called `.env` on the droplet only.
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+`.env.example` is a template with placeholder values. Copy it, then replace each placeholder:
+
+- `DOMAIN` — the site's domain (`codewheel.ca`). Caddy uses this to request the HTTPS
+  certificate.
+- `POSTGRES_PASSWORD` — a new, strong password made up for this server. Nobody types it by
+  hand; the app and database both read it from this file.
+- `CLAUDE_API_KEY` — an API key created in the Anthropic Console, used by Ask Firesight.
+
+`.env` is listed in `.gitignore`, so Git ignores it. It stays on the droplet and is never
+committed or pushed.
+
+## 8. Build and start the app
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+- `-f docker-compose.prod.yml` — use the production setup, not the local-development one.
+- `--build` — build the Firesight image from the code just cloned.
+- `-d` — run in the background, so the app keeps running after you log out.
+
+This starts three containers: Caddy (handles HTTPS), the Firesight app (API plus the
+website), and Postgres/PostGIS (the database). The first build takes several minutes. The app
+creates its own database tables on first start, so there's no separate setup step.
+
+Useful checks:
+
+```bash
+docker compose -f docker-compose.prod.yml ps          # are all three containers running?
+docker compose -f docker-compose.prod.yml logs -f app # watch the app's log output
+```
+
+## 9. Confirm the site works
+
+Opened `https://codewheel.ca` in a browser. The first visit can take a few extra seconds while
+Caddy gets a free HTTPS certificate from Let's Encrypt; after that it renews automatically.
+
+Check that the page loads over HTTPS (padlock in the address bar), the map appears with
+wildfire points on it, and Ask Firesight answers a question.
+
+### Problem found at launch: the map didn't load
+
+The site loaded, but the map failed. The browser's developer tools (Network tab) show two
+MapLibre JavaScript files returning "404 Not Found":
+
+- `maplibre-gl-worker.mjs` — a helper script MapLibre runs in the background to draw the map.
+- `maplibre-gl-shared.mjs` — a file the worker script loads for itself.
+
+**Why it only broke on the live site:** during local development (`npm run dev`), Vite serves
+files straight out of `node_modules`, so everything is found. For production (`npm run
+build`), Vite only includes files it knows the app uses. MapLibre finds these two files
+itself at runtime, so Vite never saw them and left them out of the build.
+
+**Fix:** tell Vite about both files so it includes them.
+
+- The worker: `WildfireMap.tsx` imports it with `?url`, which makes Vite include the file and
+  return its real address. That address is then passed to MapLibre with `setWorkerUrl()`.
+- The shared file: the worker asks for it by a fixed name, `./maplibre-gl-shared.mjs`, so it
+  has to exist under exactly that name. `vite.config.ts` uses `vite-plugin-static-copy` to
+  copy it into the build unchanged.
+
+**Lesson:** a working `npm run dev` doesn't prove the production build works. Running `npm
+run build` then `npm run preview` locally is a quick way to catch this kind of problem before
+deploying.
+
+### Problem found after launch: `www.codewheel.ca` failed
+
+`https://codewheel.ca` worked, but `https://www.codewheel.ca` showed "Secure Connection
+Failed" (`SSL_ERROR_INTERNAL_ERROR_ALERT`).
+
+**Why:** DNS sent `www` to the droplet correctly, but the `Caddyfile` only listed the main
+domain. Caddy only gets HTTPS certificates for sites listed in the `Caddyfile`, so it had no
+certificate for `www` and refused the connection.
+
+**Fix:** added a `www.{$DOMAIN}` block to the `Caddyfile`. Caddy now gets a certificate for
+`www` as well, and permanently redirects it to `https://codewheel.ca`, so the site has one
+main address.
+
+**Applying it on the droplet:**
+
+```bash
+cd ~/Firesight
+git pull
+docker compose -f docker-compose.prod.yml restart caddy
+```
+
+This needs a `restart`, not just `up -d`. The `Caddyfile` is mounted into the Caddy container
+as a single file, and `git pull` replaces that file with a new one. A running container keeps
+reading the old copy until it restarts, and `up -d` doesn't restart a container whose
+settings haven't changed.
+
 ---
 
 ## Progress so far
@@ -206,7 +307,7 @@ needs to already contain the production deployment files (Dockerfile, compose fi
 - [x] Logged into the droplet, OS updated
 - [x] Docker + Compose plugin installed and verified
 - [x] Repository cloned onto the droplet
-- [ ] Set up `.env` with real secrets
-- [ ] `docker compose -f docker-compose.prod.yml up -d --build`
-- [ ] Confirm the site loads over HTTPS
+- [x] Set up `.env` with real secrets
+- [x] `docker compose -f docker-compose.prod.yml up -d --build`
+- [x] Confirm the site loads over HTTPS (after fixing the MapLibre build issue)
 - [ ] Set up the dedicated deploy key + GitHub Actions secrets for continuous deployment

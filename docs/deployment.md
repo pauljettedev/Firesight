@@ -85,6 +85,10 @@ To deploy an update later, `git pull` on the droplet and re-run the step 6 comma
 rebuilds only what changed. Once continuous deployment (below) is set up, this happens
 automatically instead.
 
+Changes to the `Caddyfile` are the exception: it's bind-mounted as a single file, and a
+running container keeps seeing the old copy after `git pull` replaces it. Apply them with
+`docker compose -f docker-compose.prod.yml restart caddy`.
+
 ## Continuous deployment
 
 Pushing to `main` runs the existing CI checks (`.github/workflows/ci.yml`), and only if those
