@@ -34,7 +34,8 @@ migration step.
 ## First deploy on a server
 
 This assumes the server already has the shared network (`docker network create codewheel`,
-run once), the codewheel Caddy is running (see the codewheel repo), and a DNS A record for
+run once), the codewheel Caddy is running (see the
+[codewheel repo](https://github.com/pauljettedev/codewheel)), and a DNS A record for
 `firesight.codewheel.ca` points at the server.
 
 ```bash
