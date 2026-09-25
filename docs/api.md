@@ -1,95 +1,99 @@
 # API
 
-Development base URL:
+All endpoints return JSON. Local base URL: `http://localhost:5213`.
 
-```text
-http://localhost:5213
-```
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/health` | API and database status |
+| GET | `/api/wildfires` | All current fires |
+| GET | `/api/wildfires/near` | Fires within a distance of a point |
+| GET | `/api/wildfires/sync-state` | When CWFIS was last synced |
+| GET | `/api/locations/geocode` | Look up a Canadian place name |
+| POST | `/api/ask` | Ask Firesight a question |
 
-## Health
+The MCP endpoint is at `/mcp`. See [mcp.md](mcp.md).
 
-```http
-GET /api/health
-```
+## GET /api/wildfires
 
-Returns API and PostgreSQL connectivity status.
+Returns every current fire. Each fire has:
 
-## Wildfires
+| Field | Meaning |
+| --- | --- |
+| `id` | Firesight's ID |
+| `externalId` | CWFIS `national_fire_id` |
+| `agency` | Reporting agency code, e.g. `BC` |
+| `latitude`, `longitude` | Location |
+| `areaHectares` | Size, or `null` if CWFIS didn't report it |
+| `status` | CWFIS stage of control, exactly as sent (`OC`, `BH`, `UC`, `EX`) |
+| `statusDateUtc` | When CWFIS last updated the status |
+| `lastSeenInFeedUtc` | When Firesight last saw this fire in the feed |
+| `isStale` | `true` if not seen in the feed for 48 hours (configurable) |
+| `name`, `startDate` | Always `null`: CWFIS doesn't provide them |
 
-```http
-GET /api/wildfires
-```
+Extinguished fires are hidden 7 days after Firesight first sees them as extinguished. See
+[data-sources.md](data-sources.md).
 
-Returns the current/recent wildfire records stored in PostgreSQL/PostGIS.
-
-Coordinates are exposed as latitude/longitude for the web client while persistence uses a PostGIS geography point.
-
-Relevant freshness fields include:
-
-- `statusDateUtc` - source-level status timestamp from CWFIS `status_date`
-- `lastSeenInFeedUtc` - when Firesight last observed the wildfire in an accepted feed feature
-- `isStale` - derived from `lastSeenInFeedUtc` and the configured stale threshold
-
-`isStale` describes Firesight's observation freshness only. It does not alter the raw CWFIS stage-of-control status.
-
-## Wildfires within a radius
-
-```http
-GET /api/wildfires/near?latitude=45.4215&longitude=-75.6972&radiusKm=25
-```
-
-Returns wildfire records whose PostGIS geography point falls within the requested radius, ordered nearest first.
-
-Each result contains:
-
-- `wildfire` - the normal wildfire DTO
-- `distanceKm` - distance from the supplied point in kilometres
-
-Query constraints:
-
-- `latitude`: finite value from `-90` to `90`
-- `longitude`: finite value from `-180` to `180`
-- `radiusKm`: finite value greater than `0`
-
-Invalid values return `400 Bad Request` using a standard validation Problem Details response. Validation rules and messages originate in the Application layer; the API only translates the application validation failure into HTTP. The spatial query uses the indexed PostGIS geography column rather than loading records and calculating distances in application memory.
-
-## CWFIS synchronization
-
-CWFIS data acquisition is owned by the backend. The hosted synchronization service refreshes the current CWFIS snapshot at application startup and then hourly.
-
-The public API does not expose an endpoint that triggers synchronization. Refresh failures are non-fatal; existing stored data remains available.
-
-Features without `national_fire_id` are rejected rather than assigned a generated identifier.
-
-## CWFIS feed sync state
+## GET /api/wildfires/near
 
 ```http
-GET /api/wildfires/sync-state
+GET /api/wildfires/near?latitude=45.42&longitude=-75.70&radiusKm=25
 ```
 
-Returns dataset-level CWFIS fetch metadata, including:
+| Parameter | Allowed values |
+| --- | --- |
+| `latitude` | -90 to 90 |
+| `longitude` | -180 to 180 |
+| `radiusKm` | more than 0, up to 1000 |
 
-- last attempt time
-- last successful fetch time
-- whether the last attempt succeeded
-- received feature count
-- accepted feature count
-- rejected feature count
+Returns fires nearest first, each as `{ wildfire, distanceKm }`.
 
-These values describe the dataset fetch. They do not imply that every stored wildfire was present or individually refreshed during that fetch.
+## GET /api/wildfires/sync-state
 
-Detailed sync failure messages may be retained internally for diagnostics but are not included in the public sync-state response.
+The last CWFIS sync: when it was attempted, when it last succeeded, whether it succeeded, and
+how many fires were received, accepted, and rejected. A successful sync doesn't mean every
+stored fire was in it. That's what each fire's `lastSeenInFeedUtc` is for.
 
-## API error handling
+## GET /api/locations/geocode
 
-API exceptions are handled centrally through ASP.NET Core `IExceptionHandler` and Problem Details.
+```http
+GET /api/locations/geocode?query=Kamloops
+```
 
-Current mappings:
+Returns `{ displayName, latitude, longitude }` for the best match in Canada, or `404` if
+nothing matches. Uses OpenStreetMap's Nominatim service.
 
-- Application validation failures -> `400 Bad Request` with validation Problem Details
-- unexpected exceptions -> `500 Internal Server Error` with a generic Problem Details body
-- client-aborted requests -> `499 Client Closed Request` for server-side logging/status purposes
+## POST /api/ask
 
-Unexpected exception messages and stack traces are not returned to clients. Problem Details responses include the ASP.NET Core request `traceId` so a client-visible error can be correlated with server logs. Empty framework-generated error responses, such as a missing required query parameter or an unmatched route, are also filled by status-code middleware using Problem Details.
+```json
+{ "question": "Are there any out-of-control fires near Kamloops?" }
+```
 
-The API does not infer client errors from broad framework exception types such as `ArgumentOutOfRangeException`; only the explicit Application validation exception is mapped to HTTP 400.
+`question` is required, up to 500 characters. Returns:
+
+- `answer`: the answer text
+- `toolsUsed`: which Firesight tools were called to answer it
+- `mapContext`: a point and radius to show on the map, or `null`
+
+How it works: [ADR 007](decisions/007-ask-firesight.md).
+
+## Rate limits
+
+Limits are per IP address. Going over returns `429 Too Many Requests`.
+
+| Endpoint | Limit | Why |
+| --- | --- | --- |
+| `/api/ask` | 10 per minute | Each question costs money in Claude API usage |
+| `/api/locations/geocode` | 20 per minute | Keeps Firesight within Nominatim's usage policy |
+
+## Errors
+
+Errors use the standard Problem Details format, with a `traceId` to match server logs.
+
+| Status | When |
+| --- | --- |
+| `400` | Invalid input. The response lists the errors by field. |
+| `404` | Not found |
+| `429` | Rate limit exceeded |
+| `500` | Server error. No internal details are included. |
+
+Why only some errors become `400`: [ADR 009](decisions/009-api-errors.md).

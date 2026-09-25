@@ -1,71 +1,37 @@
 # MCP
 
-## Purpose
+Firesight has an MCP (Model Context Protocol) server, so AI assistants can query its wildfire
+data directly. It runs inside the API at `/mcp` over HTTP, with no login and no session
+state.
 
-Firesight exposes selected application capabilities through Model Context Protocol (MCP) tools so an AI model can query Firesight data through controlled application interfaces.
+Local URL: `http://localhost:5213/mcp`
 
-MCP is not the API used by the React frontend.
+## Tools
 
-```text
-React -------- REST --------> Firesight.Application
-AI model ----- MCP tools ---> Firesight.Application
-```
+| Tool | Inputs | Returns |
+| --- | --- | --- |
+| `get_active_wildfires` | none | All current fires |
+| `get_wildfire_by_external_id` | `externalId` (CWFIS `national_fire_id`) | One fire, or `null` |
+| `find_wildfires_near_location` | `latitude`, `longitude`, `radiusKm` | Fires nearest first, with `distanceKm` |
 
-Both interfaces reuse the same application services.
+Fire fields match the REST API. See [api.md](api.md).
 
-## Implemented tools
+Ask Firesight doesn't use this MCP server. It has its own tool list, which adds place-name
+lookup and sync state. See [ADR 007](decisions/007-ask-firesight.md).
 
-### `get_active_wildfires`
+## Rules
 
-Returns the current wildfire records available in Firesight.
+- Tools call the same Application services as the REST API. No logic is copied into
+  `Firesight.Mcp`, and tools never query the database ([ADR 005](decisions/005-layered-backend.md)).
+- Bad input (for example, latitude 200) returns a tool error with the validation message.
+  Any other failure returns a generic error with no internal details.
+- Production and the MCP tests register tools through the same `WithFiresightTools()` call,
+  so the tests always check what's actually deployed.
 
-### `get_wildfire_by_external_id`
+## Nullable fields in output schemas
 
-Returns one current wildfire record by its CWFIS `national_fire_id`, or `null` when no current record is available.
-
-### `find_wildfires_near_location`
-
-Finds current wildfire records within a radius of a latitude/longitude point.
-
-Inputs:
-
-```text
-latitude     - decimal degrees, -90 to 90
-longitude    - decimal degrees, -180 to 180
-radiusKm     - search radius in kilometres, greater than 0
-```
-
-Results are ordered nearest first and include `distanceKm`.
-
-The tool delegates to `IWildfireService.FindWildfiresNearAsync`; MCP does not duplicate the spatial query or validation rules.
-
-## Registration and schemas
-
-Firesight uses the MCP C# SDK's attribute-based tool registration. Production and transport-level integration tests both use the same `WithFiresightTools()` registration extension so the test host cannot silently drift from the tool set registered by the API.
-
-Tool input schemas are generated from the .NET method signatures. Structured content is enabled for the wildfire tools.
-
-For wildfire output schemas, Firesight applies a small portability override when tools are listed. The .NET schema generator can represent nullable values as JSON Schema type arrays such as `"type": ["string", "null"]`. That syntax is valid JSON Schema, but some MCP clients reject or mishandle it. Firesight therefore advertises equivalent `anyOf` branches with one type per branch while keeping null as part of the contract.
-
-The explicit output schemas are limited to this MCP interoperability boundary; application DTOs and business rules remain unchanged.
-
-## Validation and errors
-
-Application validation rules remain in `Firesight.Application`.
-
-For example, latitude range validation is performed by `WildfireService`, not repeated in the MCP project.
-
-When an application validation failure reaches the MCP boundary, the tool translates it to an MCP tool error with a safe validation message that an AI client can act on.
-
-Unexpected exceptions are not rewritten with their internal exception text. The MCP SDK returns a generic tool error for those failures, avoiding accidental leakage of implementation details.
-
-## Design rules
-
-- MCP tools expose application capabilities, not raw database access.
-- Tools delegate to `Firesight.Application`.
-- Business and spatial-query logic must not be duplicated in MCP.
-- Tool inputs and outputs should be narrow, typed, and easy to reason about.
-- Prefer SDK-generated schemas except where an explicit interoperability constraint requires a portable MCP output schema.
-- The AI should answer from tool results rather than assumed model knowledge.
-- AI usage should be rate-limited in the public demo.
-- The Claude API key must remain server-side.
+.NET describes a field that can be null as `"type": ["string", "null"]`. That's valid JSON
+Schema, but some MCP clients reject it. Firesight rewrites these fields as
+`anyOf: [{ "type": "string" }, { "type": "null" }]`, which means the same thing and works
+everywhere. The rewrite only affects the schemas MCP publishes. The application's data types
+are unchanged.

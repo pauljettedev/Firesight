@@ -4,16 +4,7 @@
 
 Keep the portfolio site inexpensive while still demonstrating realistic deployment practices.
 
-## Local development
-
-Docker Compose currently runs PostgreSQL/PostGIS locally.
-
-```text
-Docker Compose
-└── firesight-postgres
-```
-
-The API and React frontend currently run directly on the development machine.
+For running locally, see [setup.md](setup.md).
 
 ## Hosted architecture
 
@@ -138,7 +129,7 @@ public feed: the next scheduled CWFIS sync repopulates current wildfire data fro
 Implemented:
 - the Claude API key is a server-side secret (`.env`, never in source control or shipped to
   the browser)
-- per-IP rate limiting on the `/api/ask` endpoint (see `Program.cs`)
+- per-IP rate limiting on `/api/ask` (see [api.md](api.md#rate-limits))
 - a bounded input length on the question field and a bounded max output token count (see
   `AskFiresightEndpoints.cs` / `ClaudeAskFiresightService.cs`)
 - the interactive map never calls Claude — AI usage only happens when a user explicitly asks

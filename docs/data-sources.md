@@ -1,100 +1,85 @@
-# Data Sources
+# Data sources
 
-## Canadian Wildland Fire Information System (CWFIS)
+## CWFIS
 
-Firesight uses Natural Resources Canada's Canadian Wildland Fire Information System (CWFIS) as its primary wildfire source.
+All wildfire data comes from the Canadian Wildland Fire Information System (CWFIS), run by
+Natural Resources Canada ([ADR 002](decisions/002-cwfis.md)).
 
-Current implementation:
+| | |
+| --- | --- |
+| Service | CWFIF GeoServer, WFS 2.0 |
+| Layer | `public:cwfif_national_activefires` |
+| Format | GeoJSON, lat/long (EPSG:4326) |
+| Schedule | On API startup, then every hour |
+| Settings | `Cwfis` section of `appsettings.json` |
 
-- Service: CWFIS 2.0 / Canadian Wildland Fire Information Framework (CWFIF) GeoServer
-- Protocol: OGC Web Feature Service (WFS) 2.0
-- Layer: `public:cwfif_national_activefires`
-- Output: GeoJSON (`application/json`)
-- Coordinate system requested: EPSG:4326
-- Refresh cadence: startup plus once per hour while the API is running
+### Getting only current fires
 
-The importer targets the current CWFIS 2.0 active-fire schema rather than attempting to support legacy property-name aliases. GeoJSON point geometry is used for location when available, with the layer's latitude/longitude fields available as the corresponding source coordinates.
-
-## Current-snapshot query
-
-Despite its name, `public:cwfif_national_activefires` is a time-versioned layer containing historical observations as well as the current state. Requesting the layer without a temporal filter returns historical records, including multiple observations for the same `national_fire_id`.
-
-Firesight queries only the records valid at the instant the synchronization begins. The WFS request applies the same validity rule used by the CWFIS interactive map:
+Despite its name, the active-fires layer also holds old records: each row is valid for a time
+window (`record_start` to `record_end`). Firesight asks only for rows valid at the moment the
+sync starts:
 
 ```text
-record_start <= <snapshot UTC>
-AND
-record_end > <snapshot UTC>
+record_start <= sync time  AND  record_end > sync time
 ```
 
-`record_start` and `record_end` describe the validity window of a CWFIS layer record. They are not interpreted as wildfire start or extinguishment dates.
+These two fields are the row's validity window, not when the fire started or ended.
 
-The CWFIS GeoServer layer does not expose a primary key that GeoServer can use for natural-order paging. A paged request using `startIndex` without an explicit sort is rejected by the server. Firesight therefore requests a deterministic manual sort on `national_fire_id` and pages through the filtered current snapshot using `count` and `startIndex`.
+### Paging
 
-A single-field sort on `national_fire_id` is only safe if the filtered current snapshot never contains more than one row per fire — the unfiltered historical feed (`cwfif_national_reportedfires`) does not have this guarantee, since the same fire is legitimately reported on multiple days. Verified against live API output (2026-09-12): a full current-snapshot pull returned 480 active fires with 480 unique `national_fire_id` values — no duplicates within a single snapshot, confirming the single-field sort is safe for this specific query. See `docs/cwfis-historical-reference.md` for the historical-feed pagination requirements this does not apply to.
+The layer has no key GeoServer can page on by default, so Firesight sorts by
+`national_fire_id` and fetches pages with `count` and `startIndex`. This is safe because the
+current snapshot has one row per fire. (Checked on 2026-09-12: 480 fires, 480 unique IDs.)
 
-The snapshot timestamp is captured once per synchronization attempt and reused for every page so that a multi-page fetch cannot drift across different validity instants. If any page fails, the source fetch fails rather than treating a partial set of pages as a successful dataset refresh.
+The same sync time is used for every page, so all pages describe the same moment. If any page
+fails, the whole sync fails and nothing is saved.
 
-## CWFIS 2.0 active-fire schema
+### Field mapping
 
-Firesight maps the current `public:cwfif_national_activefires` fields as follows:
+| CWFIS field | Firesight field | Notes |
+| --- | --- | --- |
+| `national_fire_id` | `ExternalId` | Required. Features without it are rejected and counted. |
+| `agency_code` | `Agency` | |
+| `fire_size` | `AreaHectares` | CWFIS sends `-1` for "not reported". Firesight stores it as `null`. |
+| `stage_of_control_status` | `Status` | Stored exactly as sent. |
+| `status_date` | `StatusDateUtc` | When CWFIS last updated the status |
+| point geometry | `Location` | |
 
-- `national_fire_id` -> `ExternalId`
-- `agency_code` -> `Agency`
-- `fire_size` -> `AreaHectares`
-- `stage_of_control_status` -> `Status`
-- `status_date` -> `StatusDateUtc`
-- `latitude` / `longitude` or GeoJSON point geometry -> location
+CWFIS has no fire name or start date in this layer, so `Name` and `StartDate` stay empty.
 
-`national_fire_id` is the required external identity. Firesight does not manufacture fallback wildfire identifiers; a feature without `national_fire_id` is rejected and included in the rejected-feature count for that sync attempt.
+Status can move in either direction, for example from "under control" back to "out of
+control". Firesight never assumes a status only moves one way.
 
-`stage_of_control_status` is stored exactly as supplied by CWFIS. Firesight does not map it to a separate application enum. Status is also treated as non-monotonic: a later CWFIS observation may move a fire to either a more-controlled or less-controlled stage, so the application must not impose one-way status-transition rules.
+## Freshness
 
-The active-fire schema does not expose a fire-name or fire-start-date field used by this importer. `Name` and `StartDate` are therefore left unset rather than inferred. `record_start` and `record_end` are not interpreted as wildfire lifecycle dates.
+Firesight tracks two separate things ([ADR 004](decisions/004-wildfire-freshness.md)):
 
-`status_date` is stored as `StatusDateUtc` and represents source-level status freshness. It is distinct from the time Firesight last saw the record in a successful feed response.
+- **Sync state:** when the feed was last fetched, and how many fires were received, accepted,
+  and rejected.
+- **Per-fire freshness:** when each fire was last seen in the feed (`LastSeenInFeedUtc`). A fire
+  not seen for `WildfireFreshness:StaleAfterHours` (default 48) is marked stale.
 
-## Freshness and synchronization
+Stale only means "Firesight hasn't seen this fire lately". It never changes the fire's status,
+and a fire missing from the feed isn't assumed to be out.
 
-Firesight tracks freshness at two different levels.
+## Extinguished fires
 
-### Dataset-level sync state
+When a fire's status becomes `EX` (extinguished), Firesight records when it first saw that.
+The fire stays visible for `WildfireRetention:ExtinguishedDays` (default 7) and is then hidden
+from the API, the map, and MCP. It is not deleted.
 
-Each CWFIS fetch records synchronization metadata including:
+## What the database is for
 
-- last attempt time
-- last successful fetch time
-- whether the last attempt succeeded
-- received feature count
-- accepted feature count
-- rejected feature count
+The database holds current and recent fires for the app. It is not a historical archive.
+Historical data should be queried live from CWFIS instead. See
+[cwfis-historical-reference.md](cwfis-historical-reference.md).
 
-A successful dataset fetch means the feed request completed and was processed. It does **not** mean that every wildfire already stored by Firesight was refreshed during that fetch.
+## When CWFIS is down
 
-### Per-fire freshness
+A failed sync is logged, and Firesight keeps serving the data it already has.
 
-Each stored wildfire tracks when Firesight last observed it in an accepted CWFIS feed feature (`LastSeenInFeedUtc`). The API derives `IsStale` from the age of that observation.
+## Nominatim
 
-The stale threshold is configured with:
-
-```text
-WildfireFreshness:StaleAfterHours
-```
-
-The current default is 48 hours.
-
-Staleness is a Firesight observation-quality indicator only. It does not modify or reinterpret the raw CWFIS stage-of-control status.
-
-A wildfire not present in a later feed is not treated as having undergone a particular CWFIS status transition merely because it was absent. This prevents feed completeness and record lifecycle from being conflated.
-
-## Local data role
-
-The PostgreSQL/PostGIS database is a current/recent-state operational store for the demo, not a complete historical wildfire archive. Historical CWFIS data, if added to the product, should be queried from an appropriate historical source rather than inferred from repeated active-fire snapshots.
-
-## Reliability behavior
-
-CWFIS is an upstream public service and may be temporarily unavailable. A failed refresh is logged and does not stop Firesight from serving the last successfully stored data.
-
-## Disclaimer
-
-Firesight is a portfolio demonstration and is not an emergency or operational wildfire service. The UI should link users to CWFIS and direct operational decisions to official federal, provincial, territorial, and Parks Canada sources.
+Place-name search ("fires near Kamloops") uses OpenStreetMap's
+[Nominatim](https://nominatim.org/) service, limited to Canada. Requests are rate-limited to
+stay within Nominatim's usage policy. See [api.md](api.md#rate-limits).

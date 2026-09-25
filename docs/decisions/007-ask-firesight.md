@@ -4,8 +4,8 @@
 
 ## Decision
 
-Ask Firesight uses Claude (Messages API with tool use) to turn a question into calls to the
-same five tools that MCP exposes. Claude only chooses which tool to call and what kind of
+Ask Firesight uses Claude (Messages API with tool use) to turn a question into calls to five
+Firesight tools: the three MCP tools, plus place-name lookup and sync state. Claude only chooses which tool to call and what kind of
 answer is wanted (count, yes/no, status, records). Firesight's own code works out the answer
 from the tool results, and fire details on screen always come from the Firesight API.
 

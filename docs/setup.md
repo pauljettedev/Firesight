@@ -1,130 +1,86 @@
-# Local Setup
+# Setup
 
-## Prerequisites
+How to run and test Firesight on your own machine. Commands are PowerShell, run from the
+repository root unless noted.
 
-Install:
+## 1. Install
 
+- Git
+- Docker Desktop
 - .NET 10 SDK
 - Node.js LTS
-- npm
-- Docker Desktop
-- Git
-- Visual Studio or another suitable IDE
 
-## Repository structure
+## 2. Get the code
 
-```text
-Firesight/
-├── src/
-│   ├── Firesight.Api/
-│   ├── Firesight.Application/
-│   ├── Firesight.Domain/
-│   ├── Firesight.Infrastructure/
-│   ├── Firesight.Mcp/
-│   └── Firesight.Web/
-├── tests/
-│   ├── Firesight.UnitTests/
-│   └── Firesight.IntegrationTests/
-├── docs/
-├── docker-compose.yml
-└── Firesight.slnx
+```powershell
+git clone https://github.com/pauljettedev/Firesight.git
+cd Firesight
 ```
 
-## Start PostgreSQL/PostGIS
+## 3. Start the database
 
-From the repository root:
+With Docker Desktop running:
 
 ```powershell
 docker compose up -d
-docker compose ps
 ```
 
-Verify PostgreSQL:
+This runs PostgreSQL with PostGIS in a container. You don't need to create any tables: the
+API does that itself when it starts.
+
+## 4. Add your Claude API key (optional)
+
+Only Ask Firesight needs this. Everything else works without it.
 
 ```powershell
-docker exec firesight-postgres pg_isready -U firesight -d firesight
+dotnet user-secrets set "Claude:ApiKey" "<your key>" --project src/Firesight.Api
 ```
 
-Expected result includes:
+Get a key from the [Anthropic Console](https://console.anthropic.com/). User secrets are stored
+outside the repository, so the key can't be committed by accident.
 
-```text
-accepting connections
-```
-
-The API applies EF Core migrations on startup. The initial migration enables the PostGIS extension and creates the wildfire table and unique external-ID index.
-
-## Start the API
-
-From the repository root:
+## 5. Start the API
 
 ```powershell
 dotnet run --project src/Firesight.Api
 ```
 
-Current development URL:
+The API runs at `http://localhost:5213`. On startup it loads current fires from CWFIS, then
+refreshes every hour. If CWFIS is down, the API still starts and serves whatever it already has.
 
-```text
-http://localhost:5213
-```
+Check it's working: `http://localhost:5213/api/health`
 
-The first startup attempts to import current active fires from CWFIS. An upstream CWFIS failure is logged but does not prevent the API from starting. The API then refreshes the feed hourly while it is running.
-
-Per-fire staleness is controlled by `WildfireFreshness:StaleAfterHours`; the current default is 48 hours.
-
-Useful endpoints:
-
-```text
-http://localhost:5213/api/health
-http://localhost:5213/api/wildfires
-http://localhost:5213/api/wildfires/sync-state
-```
-
-Force an immediate CWFIS refresh:
-
-```powershell
-Invoke-RestMethod -Method Post http://localhost:5213/api/wildfires/sync
-```
-
-## Start the frontend
+## 6. Start the web app
 
 In a second terminal:
 
 ```powershell
 cd src/Firesight.Web
+npm install
 npm run dev
 ```
 
-Current development URL:
+Open `http://localhost:5173`. The dev server forwards `/api` requests to the API.
 
-```text
-http://localhost:5173
-```
-
-Vite proxies requests beginning with `/api` to the ASP.NET Core API.
-
-## Frontend checks
+## Run the tests
 
 ```powershell
+dotnet test                          # all backend tests
+cd src/Firesight.Web
+npm test                             # UI tests
 npm run lint
-npm run build
+npm run build                        # type-check and production build
 ```
 
-## Backend build
+The backend integration tests start their own throwaway PostGIS database in Docker, so Docker
+must be running.
 
-From the repository root:
+## Stop everything
+
+Press `Ctrl+C` in the API and web app terminals, then:
 
 ```powershell
-dotnet build
+docker compose down
 ```
 
-`dotnet build` performs package restore automatically unless `--no-restore` is specified.
-
-## Integration tests
-
-The integration test project uses Testcontainers to start a disposable PostGIS-backed PostgreSQL instance and applies the real EF Core migrations before running repository tests. Docker Desktop must be running.
-
-```powershell
-dotnet test tests/Firesight.IntegrationTests/Firesight.IntegrationTests.csproj
-```
-
-These tests exercise the PostgreSQL/PostGIS persistence path rather than EF Core's in-memory provider.
+Your data is kept in a Docker volume and will still be there next time.

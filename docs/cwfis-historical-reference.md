@@ -1,5 +1,8 @@
 # CWFIS Historical Data Reference
 
+> **Research notes for a feature that isn't built yet.** Nothing here describes how Firesight
+> works today. For current behaviour, see [data-sources.md](data-sources.md).
+
 **Purpose:** reference for extending Firesight to query CWFIS/CWFIF live for historical wildfire data (no local historical copy).
 
 **Provenance key** — every fact below is tagged so you know how much to trust it:

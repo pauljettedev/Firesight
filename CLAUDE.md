@@ -26,13 +26,14 @@ Integration tests use Testcontainers to spin up a real disposable PostGIS-backed
 
 ```powershell
 npm run dev      # Vite dev server at http://localhost:5173, proxies /api to :5213
+npm test         # Vitest UI tests
 npm run lint
 npm run build    # tsc -b && vite build
 ```
 
 ### CI (`.github/workflows/ci.yml`)
 
-Mirrors the above: `dotnet restore/build/test` on `Firesight.slnx`, and `npm ci && npm run lint && npm run build` in `src/Firesight.Web`.
+Mirrors the above: `dotnet restore/build/test` on `Firesight.slnx`, and `npm ci && npm run lint && npm run test && npm run build` in `src/Firesight.Web`. A `deploy` job runs only after both pass.
 
 ## Architecture
 
@@ -79,13 +80,17 @@ MCP is a separate interface from the REST API but both call the same `Firesight.
 
 ### Ask Firesight (natural-language query feature)
 
-`ClaudeAskFiresightService` (`Firesight.Infrastructure/Claude`) implements `IAskFiresightService` using the Claude API (Messages API, tool use) — configured via the `Claude:Model`/`Claude:ApiKey` options (`ClaudeOptions`). It runs an agentic tool-call loop (max 4 rounds) over the same five Firesight tools MCP exposes (`geocode_location`, `get_active_wildfires`, `get_wildfire_by_external_id`, `find_wildfires_near_location`, `get_feed_sync_state`), calling straight through to `IWildfireService`/`ILocationGeocoder` — never the database directly. For count/exists/status questions, the *application code* computes the deterministic answer from tool output rather than trusting the model to count or state status itself; the model's role is limited to picking the right tool and `responseMode`. `AnthropicClient` is registered as a singleton in DI (it's a stateless, thread-safe API client — do not switch it back to scoped/per-request).
+`ClaudeAskFiresightService` (`Firesight.Infrastructure/Claude`) implements `IAskFiresightService` using the Claude API (Messages API, tool use) — configured via the `Claude:Model`/`Claude:ApiKey` options (`ClaudeOptions`). It runs an agentic tool-call loop (max 4 rounds) over five tools defined in the service itself (`geocode_location`, `get_active_wildfires`, `get_wildfire_by_external_id`, `find_wildfires_near_location`, `get_feed_sync_state`; MCP exposes only the middle three), calling straight through to `IWildfireService`/`ILocationGeocoder` — never the database directly. For count/exists/status questions, the *application code* computes the deterministic answer from tool output rather than trusting the model to count or state status itself; the model's role is limited to picking the right tool and `responseMode`. `AnthropicClient` is registered as a singleton in DI (it's a stateless, thread-safe API client — do not switch it back to scoped/per-request).
 
 ## Documentation map
 
+Docs should stay short and plain, and say each thing in one place (link instead of repeating). The code is the source of truth.
+
+- `docs/setup.md` — run and test locally (including the Claude API key via user secrets)
 - `docs/architecture.md` — layering/dependency rules in full
 - `docs/api.md` — REST endpoint contracts
 - `docs/data-sources.md` — CWFIS ingestion, schema mapping, freshness semantics
 - `docs/cwfis-historical-reference.md` — CWFIS historical/time-series data (`cwfif_national_reportedfires`, NBAC), for a not-yet-built historical-query feature; live-verified field schema, query syntax, and a recommendation to query live rather than store a local historical copy
 - `docs/mcp.md` — MCP tool contracts and design rules
+- `docs/deployment.md`, `docs/server-setup-walkthrough.md` — production hosting
 - `docs/decisions/*.md` — ADRs, indexed in `docs/decisions/README.md` (stack, CWFIS, PostGIS, freshness, layering, UI components, Ask Firesight, testing, API errors)
