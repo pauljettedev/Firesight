@@ -16,18 +16,11 @@ public static class LocationEndpoints
             .RequireRateLimiting("Geocode");
 
         group.MapGet("/geocode", async (
-            string query,
+            string? query,
             ILocationGeocoder geocoder,
             CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                return Results.ValidationProblem(
-                    new Dictionary<string, string[]>
-                    {
-                        [nameof(query)] = ["A town or city is required."]
-                    });
-            }
+            LocationQuery.Validate(query);
 
             var location = await geocoder.FindAsync(query, cancellationToken);
 

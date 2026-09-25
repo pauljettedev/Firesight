@@ -5,14 +5,11 @@ namespace Firesight.Api.Endpoints;
 
 public static class AskFiresightEndpoints
 {
-    private const int MaxQuestionLength = 500;
-
     public static IEndpointRouteBuilder MapAskFiresightEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        // Limits requests per IP address. The policy is defined in Program.cs.
-        // AI calls cost real money per request, so this is the one endpoint
-        // that needs a limit.
+        // Limits requests per IP address, because every question costs money
+        // in Claude API usage. The policy is defined in Program.cs.
         var group = endpoints.MapGroup("/api/ask")
             .WithTags("Ask Firesight")
             .RequireRateLimiting("AskFiresight");
@@ -22,27 +19,7 @@ public static class AskFiresightEndpoints
             IAskFiresightService service,
             CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Question))
-            {
-                return Results.ValidationProblem(
-                    new Dictionary<string, string[]>
-                    {
-                        [nameof(request.Question)] =
-                            ["A question is required."]
-                    });
-            }
-
-            if (request.Question.Length > MaxQuestionLength)
-            {
-                return Results.ValidationProblem(
-                    new Dictionary<string, string[]>
-                    {
-                        [nameof(request.Question)] =
-                        [
-                            $"Question must be {MaxQuestionLength} characters or fewer."
-                        ]
-                    });
-            }
+            AskFiresightQuestion.Validate(request.Question);
 
             var result = await service.AskAsync(
                 request.Question,
@@ -54,5 +31,5 @@ public static class AskFiresightEndpoints
         return endpoints;
     }
 
-    public sealed record AskFiresightRequest(string Question);
+    public sealed record AskFiresightRequest(string? Question);
 }

@@ -60,7 +60,7 @@ public sealed class WildfireTools(IWildfireService wildfireService)
         double latitude,
         [Description("Longitude in decimal degrees, from -180 to 180.")]
         double longitude,
-        [Description("Search radius in kilometres. Must be greater than zero.")]
+        [Description("Search radius in kilometres. Must be greater than zero and at most 1000.")]
         double radiusKm,
         CancellationToken cancellationToken)
     {
