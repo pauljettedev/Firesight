@@ -1,28 +1,23 @@
-# ADR 004: Separate feed synchronization from wildfire freshness
+# ADR 004: Feed freshness and fire freshness are tracked separately
 
-## Status
-
-Accepted
+**Status:** Accepted
 
 ## Decision
 
-Firesight will represent dataset synchronization freshness separately from the freshness of an individual wildfire record.
+Track two separate things:
 
-Dataset-level state records when the CWFIS feed was attempted and successfully fetched. Each wildfire independently records when Firesight last observed that fire in an accepted feed feature.
+- **Feed sync state:** when Firesight last tried and last succeeded in fetching the CWFIS feed,
+  and how many records were received, accepted, and rejected.
+- **Per-fire freshness:** when each fire was last seen in the feed (`LastSeenInFeedUtc`). A fire
+  is marked stale after 48 hours by default (`WildfireFreshness:StaleAfterHours`).
 
-The application derives a stale indicator from per-fire observation age. The current default stale threshold is 48 hours and is configurable through `WildfireFreshness:StaleAfterHours`.
+## Why
 
-CWFIS `stage_of_control_status` is persisted exactly as supplied and is not changed when a Firesight record becomes stale.
+A successful fetch doesn't mean every stored fire was in it. Using the fetch time as every
+fire's update time would make old data look current. A fire missing from the feed also doesn't
+tell us its status changed.
 
-## Context
+## What this means
 
-A successful CWFIS request does not guarantee that every previously known fire appears in that response. Treating the feed timestamp as the update time for every stored fire would therefore overstate data freshness.
-
-Likewise, absence from a feed is not sufficient evidence that a fire has moved to a particular lifecycle or stage-of-control state.
-
-## Consequences
-
-- The UI can distinguish "the feed was fetched recently" from "this individual fire was observed recently."
-- Older stored records can be marked stale without inventing a CWFIS status.
-- Feed completeness problems do not silently rewrite wildfire lifecycle state.
-- Synchronization and status semantics remain independently testable.
+- The UI can show "the feed was checked recently" separately from "this fire was seen recently".
+- Stale is a Firesight data-quality flag only. It never changes the CWFIS status.

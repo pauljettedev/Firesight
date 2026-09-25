@@ -1,46 +1,21 @@
-# ADR 001: Core technology stack
+# ADR 001: Technology stack
 
-## Status
-
-Accepted
+**Status:** Accepted
 
 ## Decision
 
-Firesight will use a broad, industry-recognizable stack:
+- **Frontend:** React, TypeScript, Vite, MUI, MapLibre GL JS
+- **Backend:** ASP.NET Core (C#), Entity Framework Core, OpenAPI
+- **Database:** PostgreSQL with PostGIS
+- **AI:** Claude API (Anthropic), MCP
+- **Tooling:** Docker, GitHub Actions, xUnit, Vitest
 
-- React
-- TypeScript
-- Vite
-- MUI
-- MapLibre GL JS
-- ASP.NET Core / C#
-- Entity Framework Core
-- PostgreSQL / PostGIS
-- Docker / Docker Compose
-- GitHub / GitHub Actions
-- Serilog
-- OpenAPI
-- Claude API (Anthropic)
-- MCP
+## Why
 
-## Context
+Firesight is a portfolio project. The stack should be common in real jobs, give each tool one
+clear role, and avoid niche libraries unless the problem needs them.
 
-Firesight is a portfolio project intended to demonstrate practical, transferable engineering skills to employers.
+## What this means
 
-The stack should therefore favor:
-- common technologies
-- clear architectural roles
-- realistic production practices
-- minimal use of niche libraries unless the problem genuinely requires them
-
-## Consequences
-
-Positive:
-- broad relevance to full-stack .NET roles
-- modern React/TypeScript experience
-- geospatial database experience
-- containerization and CI/CD exposure
-- practical AI/MCP integration
-
-Tradeoff:
-- the project spans several technologies and therefore requires deliberate scope control
+- The project touches many technologies, so scope has to be kept small on purpose.
+- A new library needs a clear reason to be added.

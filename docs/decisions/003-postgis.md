@@ -1,39 +1,20 @@
 # ADR 003: PostgreSQL with PostGIS
 
-## Status
-
-Accepted
+**Status:** Accepted
 
 ## Decision
 
-Use PostgreSQL with PostGIS for persistence and spatial queries.
+Store data in PostgreSQL with the PostGIS extension, accessed through EF Core, Npgsql, and
+NetTopologySuite. Spatial questions like "fires within 50 km of here" are answered by the
+database.
 
-Use:
-- Entity Framework Core
-- Npgsql
-- NetTopologySuite
+## Why
 
-## Context
+Wildfire data is about places. PostGIS already does distance searches, spatial indexes, and
+shape intersections well. Doing that by hand with latitude/longitude columns would be slower
+and easy to get wrong.
 
-Wildfire data is inherently geographic.
+## What this means
 
-Likely operations include:
-- storing fire locations
-- storing fire perimeters
-- distance queries
-- nearby-fire searches
-- region intersection queries
-- spatial indexing
-
-Implementing this manually with latitude/longitude columns would duplicate mature GIS functionality.
-
-## Consequences
-
-Positive:
-- industry-standard spatial database capabilities
-- natural support for MapLibre-backed geographic features
-- efficient spatial querying and indexing
-- useful experience with PostgreSQL/PostGIS
-
-Tradeoff:
-- local and hosted environments must support the PostGIS extension
+- Every environment (local, CI, production) needs PostGIS, not plain PostgreSQL.
+- Spatial logic is tested against a real PostGIS database (see ADR 008).
