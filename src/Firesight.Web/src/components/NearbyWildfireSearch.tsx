@@ -16,17 +16,15 @@ import {
   type NearbyWildfire,
   type Wildfire,
 } from '../services/wildfireService'
-import {
-  formatArea,
-  formatRelativeTime,
-  stageOfControlLabel,
-} from '../utils/wildfirePresentation'
+import { WildfireListItem } from './WildfireListItem'
 
 interface NearbyWildfireSearchProps {
+  selectedWildfireId?: string | null
   onSelect: (wildfire: Wildfire) => void
 }
 
 export function NearbyWildfireSearch({
+  selectedWildfireId = null,
   onSelect,
 }: NearbyWildfireSearchProps) {
   const [locationQuery, setLocationQuery] = useState('')
@@ -179,34 +177,11 @@ export function NearbyWildfireSearch({
           ) : (
             <Stack divider={<Divider flexItem />} sx={{ mt: 0.75 }}>
               {results.slice(0, 12).map((result) => (
-                <Button
+                <WildfireListItem
                   key={result.wildfire.id}
-                  onClick={() => onSelect(result.wildfire)}
-                  color="inherit"
-                  sx={{
-                    display: 'block',
-                    width: '100%',
-                    px: 0,
-                    py: 1.25,
-                    borderRadius: 0,
-                    textAlign: 'left',
-                    textTransform: 'none',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 1,
-                      alignItems: 'baseline',
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: 700 }}
-                    >
-                      {stageOfControlLabel(result.wildfire.status)}
-                    </Typography>
+                  wildfire={result.wildfire}
+                  updatedUtc={result.wildfire.lastSeenInFeedUtc}
+                  trailing={
                     <Typography
                       variant="caption"
                       color="primary.main"
@@ -214,29 +189,10 @@ export function NearbyWildfireSearch({
                     >
                       {formatDistance(result.distanceKm)}
                     </Typography>
-                  </Box>
-
-                  <Typography variant="body2" sx={{ mt: 0.25 }}>
-                    {formatArea(result.wildfire.areaHectares)}
-                  </Typography>
-
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', mt: 0.25 }}
-                  >
-                    {result.wildfire.agency} ·{' '}
-                    {formatRelativeTime(result.wildfire.lastSeenInFeedUtc)}
-                  </Typography>
-
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', mt: 0.1, opacity: 0.72 }}
-                  >
-                    {result.wildfire.externalId}
-                  </Typography>
-                </Button>
+                  }
+                  selected={result.wildfire.id === selectedWildfireId}
+                  onSelect={onSelect}
+                />
               ))}
             </Stack>
           )}

@@ -10,7 +10,20 @@ import type {
 import 'maplibre-gl/dist/maplibre-gl.css'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import './WildfireMap.css'
-import type { Wildfire } from '../services/wildfireService'
+import type { Wildfire } from '../../services/wildfireService'
+import type { MapFocusArea } from '../../utils/mapView'
+import {
+  defaultMapCenter,
+  defaultMapZoom,
+  useWildfireMapCamera,
+} from './useWildfireMapCamera'
+import {
+  hasWildfireLayers,
+  noSelectionId,
+  pointsLayerId,
+  selectionLayerId,
+  sourceId,
+} from './wildfireMapLayers'
 import { WildfirePopup } from './WildfirePopup'
 
 // MapLibre works out its worker script's URL at runtime by guessing it sits
@@ -21,25 +34,12 @@ import { WildfirePopup } from './WildfirePopup'
 // hand to MapLibre directly instead of letting it guess.
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
-export interface WildfireMapFocusArea {
-  latitude: number
-  longitude: number
-  radiusKm: number
-}
-
 interface WildfireMapProps {
   wildfires: Wildfire[]
   selectedWildfire?: Wildfire | null
   onWildfireSelect?: (wildfire: Wildfire | null) => void
-  focusArea?: WildfireMapFocusArea
+  focusArea?: MapFocusArea
 }
-
-const sourceId = 'wildfires'
-const pointsLayerId = 'wildfire-points'
-const selectionLayerId = 'wildfire-selection'
-const noSelectionId = '__no_selection__'
-const defaultMapCenter: [number, number] = [-96, 57]
-const defaultMapZoom = 2.7
 
 function toGeoJson(wildfires: Wildfire[]) {
   return {
@@ -88,10 +88,9 @@ export function WildfireMap({
   const activePopupRef = useRef<maplibregl.Popup | null>(null)
   const activePopupWildfireIdRef = useRef<string | null>(null)
   const mapSelectedWildfireIdRef = useRef<string | null>(null)
-  const hadFocusAreaRef = useRef(false)
 
   // The map below is created once and its click handler is set up only
-  // that one time. These three effects keep the refs updated so that
+  // that one time. These effects keep the refs updated so that
   // handler can always read the latest wildfires, selection, and
   // onWildfireSelect, without us having to rebuild the whole map every
   // time those props change.
@@ -286,7 +285,7 @@ export function WildfireMap({
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map?.isStyleLoaded()) {
+    if (!map || !hasWildfireLayers(map)) {
       return
     }
 
@@ -294,9 +293,11 @@ export function WildfireMap({
     source?.setData(toGeoJson(wildfires))
   }, [wildfires])
 
+  // Keeps the selection ring (and any open popup) in step with the selected
+  // fire. Moving the camera to it is the camera hook's job.
   useEffect(() => {
     const map = mapRef.current
-    if (!map?.isStyleLoaded()) {
+    if (!map || !hasWildfireLayers(map)) {
       return
     }
 
@@ -309,74 +310,14 @@ export function WildfireMap({
 
     const selectedId = selectedWildfire?.id ?? noSelectionId
     map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
-
-    if (!selectedWildfire) {
-      mapSelectedWildfireIdRef.current = null
-      return
-    }
-
-    if (mapSelectedWildfireIdRef.current === selectedWildfire.id) {
-      mapSelectedWildfireIdRef.current = null
-      return
-    }
-
-    map.flyTo({
-      center: [selectedWildfire.longitude, selectedWildfire.latitude],
-      zoom: Math.max(map.getZoom(), 6),
-      essential: true,
-    })
   }, [selectedWildfire])
 
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map?.isStyleLoaded()) {
-      return
-    }
-
-    if (!focusArea) {
-      if (!hadFocusAreaRef.current) {
-        return
-      }
-
-      hadFocusAreaRef.current = false
-      map.easeTo({
-        center: defaultMapCenter,
-        zoom: defaultMapZoom,
-        duration: 800,
-      })
-      return
-    }
-
-    hadFocusAreaRef.current = true
-
-    // 1 degree of latitude is about 111 km, so dividing by 111 turns our
-    // radius into degrees. A degree of longitude covers less distance as
-    // you move away from the equator, so we shrink it using cos(latitude).
-    const latitudeDelta = focusArea.radiusKm / 111
-    const longitudeScale = Math.max(
-      Math.cos((focusArea.latitude * Math.PI) / 180),
-      0.15,
-    )
-    const longitudeDelta = focusArea.radiusKm / (111 * longitudeScale)
-
-    map.fitBounds(
-      [
-        [
-          focusArea.longitude - longitudeDelta,
-          focusArea.latitude - latitudeDelta,
-        ],
-        [
-          focusArea.longitude + longitudeDelta,
-          focusArea.latitude + latitudeDelta,
-        ],
-      ],
-      {
-        padding: 48,
-        duration: 800,
-        maxZoom: 10,
-      },
-    )
-  }, [focusArea])
+  useWildfireMapCamera({
+    mapRef,
+    focusArea,
+    selectedWildfire,
+    mapSelectedWildfireIdRef,
+  })
 
   return (
     <div

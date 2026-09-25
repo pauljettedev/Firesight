@@ -1,3 +1,5 @@
+import type { Wildfire } from '../services/wildfireService'
+
 export function stageOfControlLabel(code: string): string {
   switch (code.toUpperCase()) {
     case 'OC': return 'Out of Control'
@@ -6,6 +8,18 @@ export function stageOfControlLabel(code: string): string {
     case 'EX': return 'Extinguished'
     default: return code || 'Unknown status'
   }
+}
+
+// The time a fire's record was last updated: the source's own status date
+// when it has one, otherwise when Firesight last saw the fire in the feed.
+// Used both to sort the Recent list and as the time each row shows, so the
+// two can't disagree.
+export function wildfireUpdatedUtc(wildfire: Wildfire): string {
+  return wildfire.statusDateUtc ?? wildfire.lastSeenInFeedUtc
+}
+
+export function formatRadius(radiusKm: number): string {
+  return `${Math.round(radiusKm).toLocaleString()} km`
 }
 
 export function formatArea(areaHectares: number | null): string {

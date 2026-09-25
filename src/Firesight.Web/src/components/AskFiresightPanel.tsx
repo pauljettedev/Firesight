@@ -14,6 +14,7 @@ import {
   type AskFiresightMapContext,
   type AskFiresightResult,
 } from '../services/askFiresightService'
+import { formatRadius } from '../utils/wildfirePresentation'
 
 const MaxQuestionLength = 500
 
@@ -260,8 +261,4 @@ export function AskFiresightPanel({
       </Box>
     </Box>
   )
-}
-
-function formatRadius(radiusKm: number): string {
-  return `${Math.round(radiusKm).toLocaleString()} km`
 }

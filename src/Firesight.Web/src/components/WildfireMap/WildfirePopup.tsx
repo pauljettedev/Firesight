@@ -3,7 +3,7 @@ import {
   formatArea,
   formatTimestamp,
   stageOfControlLabel,
-} from '../utils/wildfirePresentation'
+} from '../../utils/wildfirePresentation'
 
 interface WildfirePopupProps {
   name: string

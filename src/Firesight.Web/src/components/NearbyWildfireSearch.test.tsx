@@ -3,10 +3,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NearbyWildfireSearch } from './NearbyWildfireSearch'
 import { geocodeLocation } from '../services/locationService'
-import {
-  getNearbyWildfires,
-  type Wildfire,
-} from '../services/wildfireService'
+import { getNearbyWildfires } from '../services/wildfireService'
+import { buildWildfire } from '../test/fixtures'
 
 vi.mock('../services/locationService', () => ({
   geocodeLocation: vi.fn(),
@@ -18,24 +16,6 @@ vi.mock('../services/wildfireService', () => ({
 
 const mockedGeocodeLocation = vi.mocked(geocodeLocation)
 const mockedGetNearbyWildfires = vi.mocked(getNearbyWildfires)
-
-function buildWildfire(overrides: Partial<Wildfire> = {}): Wildfire {
-  return {
-    id: 'wildfire-1',
-    externalId: 'cwfis:test-1',
-    agency: 'ON',
-    name: null,
-    latitude: 45.4215,
-    longitude: -75.6972,
-    startDate: null,
-    areaHectares: 1250,
-    status: 'OC',
-    statusDateUtc: null,
-    lastSeenInFeedUtc: new Date().toISOString(),
-    isStale: false,
-    ...overrides,
-  }
-}
 
 describe('NearbyWildfireSearch', () => {
   const onSelect = vi.fn()

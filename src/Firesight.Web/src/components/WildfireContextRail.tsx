@@ -1,34 +1,26 @@
 import { useState } from 'react'
-import {
-  Box,
-  Button,
-  ButtonGroup,
-  Divider,
-  Paper,
-  Stack,
-  Typography,
-} from '@mui/material'
+import { Box, Button, ButtonGroup, Paper } from '@mui/material'
 import type { AskFiresightMapContext } from '../services/askFiresightService'
 import type { Wildfire } from '../services/wildfireService'
-import {
-  formatArea,
-  formatRelativeTime,
-  stageOfControlLabel,
-} from '../utils/wildfirePresentation'
 import { AskFiresightPanel } from './AskFiresightPanel'
 import { NearbyWildfireSearch } from './NearbyWildfireSearch'
+import { RecentWildfireList } from './RecentWildfireList'
 
 type RailMode = 'recent' | 'nearby' | 'ask'
 
 interface WildfireContextRailProps {
   recentWildfires: Wildfire[]
-  onWildfireSelect: (wildfire: Wildfire | null) => void
+  selectedWildfireId: string | null
+  onRecentWildfireSelect: (wildfire: Wildfire) => void
+  onNearbyWildfireSelect: (wildfire: Wildfire) => void
   onShowAskResultOnMap: (context: AskFiresightMapContext) => Promise<void>
 }
 
 export function WildfireContextRail({
   recentWildfires,
-  onWildfireSelect,
+  selectedWildfireId,
+  onRecentWildfireSelect,
+  onNearbyWildfireSelect,
   onShowAskResultOnMap,
 }: WildfireContextRailProps) {
   const [mode, setMode] = useState<RailMode>('ask')
@@ -65,11 +57,18 @@ export function WildfireContextRail({
 
       <Box sx={{ p: 2.25 }}>
         <Box sx={{ display: mode === 'recent' ? 'block' : 'none' }}>
-          <RecentlyUpdated wildfires={recentWildfires} />
+          <RecentWildfireList
+            wildfires={recentWildfires}
+            selectedWildfireId={selectedWildfireId}
+            onSelect={onRecentWildfireSelect}
+          />
         </Box>
 
         <Box sx={{ display: mode === 'nearby' ? 'block' : 'none' }}>
-          <NearbyWildfireSearch onSelect={onWildfireSelect} />
+          <NearbyWildfireSearch
+            selectedWildfireId={selectedWildfireId}
+            onSelect={onNearbyWildfireSelect}
+          />
         </Box>
 
         <Box sx={{ display: mode === 'ask' ? 'block' : 'none' }}>
@@ -78,89 +77,4 @@ export function WildfireContextRail({
       </Box>
     </Paper>
   )
-}
-
-function RecentlyUpdated({ wildfires }: { wildfires: Wildfire[] }) {
-  return (
-    <Box>
-      <Typography
-        variant="overline"
-        color="text.secondary"
-        sx={{ letterSpacing: '0.1em' }}
-      >
-        Recently updated
-      </Typography>
-
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-        Latest source updates in the current dataset
-      </Typography>
-
-      <Stack divider={<Divider flexItem />} sx={{ mt: 1.5 }}>
-        {wildfires.map((wildfire) => (
-          <Box key={wildfire.id} sx={{ py: 1.25 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 1,
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 700, lineHeight: 1.25 }}
-              >
-                {stageOfControlLabel(wildfire.status)}
-              </Typography>
-              <StatusDot status={wildfire.status} />
-            </Box>
-
-            <Typography variant="body2" sx={{ mt: 0.35 }}>
-              {formatArea(wildfire.areaHectares)}
-            </Typography>
-
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 0.35 }}
-            >
-              {wildfire.agency} · {formatRelativeTime(wildfire.statusDateUtc)}
-            </Typography>
-
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 0.15, opacity: 0.72 }}
-            >
-              {wildfire.externalId}
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-    </Box>
-  )
-}
-
-function StatusDot({ status }: { status: string }) {
-  return (
-    <Box
-      aria-hidden
-      sx={{
-        width: 8,
-        height: 8,
-        flex: '0 0 auto',
-        borderRadius: '50%',
-        backgroundColor: statusColor(status),
-      }}
-    />
-  )
-}
-
-function statusColor(status: string): string {
-  switch (status.toUpperCase()) {
-    case 'OC': return 'error.main'
-    case 'BH': return 'warning.main'
-    case 'UC': return 'success.main'
-    default: return 'text.secondary'
-  }
 }

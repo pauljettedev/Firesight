@@ -2,37 +2,26 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   Container,
   Paper,
   Stack,
-  Typography,
 } from '@mui/material'
 import { AppHeader } from './components/AppHeader'
+import { MapViewBanner } from './components/MapViewBanner'
 import { ObservationFreshnessChart } from './components/ObservationFreshnessChart'
 import { WildfireContextRail } from './components/WildfireContextRail'
-import {
-  WildfireMap,
-  type WildfireMapFocusArea,
-} from './components/WildfireMap'
-import type { AskFiresightMapContext } from './services/askFiresightService'
-import {
-  getNearbyWildfires,
-  getWildfires,
-  type Wildfire,
-} from './services/wildfireService'
-
-interface MapView {
-  focusArea: WildfireMapFocusArea
-  wildfires: Wildfire[]
-  label: string | null
-}
+import { WildfireMap } from './components/WildfireMap'
+import { WildfireStatusSummary } from './components/WildfireStatusSummary'
+import { getWildfires, type Wildfire } from './services/wildfireService'
+import { useMapState } from './state/useMapState'
+import { wildfiresInView } from './utils/mapView'
+import { wildfireUpdatedUtc } from './utils/wildfirePresentation'
 
 function App() {
   const [wildfires, setWildfires] = useState<Wildfire[]>([])
-  const [selectedWildfire, setSelectedWildfire] = useState<Wildfire | null>(null)
-  const [mapView, setMapView] = useState<MapView | null>(null)
+  const mapState = useMapState()
+  const { mapView, selectedWildfire } = mapState
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,19 +34,6 @@ function App() {
       .finally(() => setLoading(false))
   }, [])
 
-  const statusCounts = wildfires.reduce(
-    (counts, wildfire) => {
-      const status = wildfire.status.toUpperCase()
-
-      if (status === 'OC') counts.outOfControl += 1
-      if (status === 'BH') counts.beingHeld += 1
-      if (status === 'UC') counts.underControl += 1
-
-      return counts
-    },
-    { outOfControl: 0, beingHeld: 0, underControl: 0 },
-  )
-
   const recentWildfires = useMemo(
     () =>
       [...wildfires]
@@ -69,33 +45,14 @@ function App() {
     [wildfires],
   )
 
-  async function handleShowAskResultOnMap(
-    context: AskFiresightMapContext,
-  ) {
-    const nearby = await getNearbyWildfires(
-      context.latitude,
-      context.longitude,
-      context.radiusKm,
-    )
-
-    setSelectedWildfire(null)
-    setMapView({
-      focusArea: {
-        latitude: context.latitude,
-        longitude: context.longitude,
-        radiusKm: context.radiusKm,
-      },
-      wildfires: nearby.map((result) => result.wildfire),
-      label: context.label,
-    })
-  }
-
-  function handleContextWildfireSelect(wildfire: Wildfire | null) {
-    setMapView(null)
-    setSelectedWildfire(wildfire)
-  }
-
-  const mapWildfires = mapView?.wildfires ?? wildfires
+  // Memoized so the map only gets a new array when the view or data really
+  // changes. Without it, the single-fire case would build a fresh one-item
+  // array on every render (typing in the Ask box, say), and the map would
+  // re-send its data to MapLibre each time.
+  const mapWildfires = useMemo(
+    () => wildfiresInView(mapView, wildfires),
+    [mapView, wildfires],
+  )
 
   return (
     <Box sx={{ minHeight: '100vh' }}>
@@ -109,41 +66,7 @@ function App() {
         }}
       >
         <Stack spacing={2}>
-          <Paper
-            variant="outlined"
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'repeat(2, minmax(0, 1fr))',
-                md: 'repeat(4, minmax(0, 1fr))',
-              },
-              overflow: 'hidden',
-            }}
-          >
-            <SummaryMetric
-              label="Observed fires"
-              value={wildfires.length}
-              color="primary.main"
-            />
-            <SummaryMetric
-              label="Out of control"
-              value={statusCounts.outOfControl}
-              color="error.main"
-              divider
-            />
-            <SummaryMetric
-              label="Being held"
-              value={statusCounts.beingHeld}
-              color="warning.main"
-              divider
-            />
-            <SummaryMetric
-              label="Under control"
-              value={statusCounts.underControl}
-              color="success.main"
-              divider
-            />
-          </Paper>
+          <WildfireStatusSummary wildfires={wildfires} />
 
           {loading && (
             <Paper
@@ -170,42 +93,18 @@ function App() {
             >
               <WildfireContextRail
                 recentWildfires={recentWildfires}
-                onWildfireSelect={handleContextWildfireSelect}
-                onShowAskResultOnMap={handleShowAskResultOnMap}
+                selectedWildfireId={selectedWildfire?.id ?? null}
+                onRecentWildfireSelect={mapState.focusWildfire}
+                onNearbyWildfireSelect={mapState.selectWildfire}
+                onShowAskResultOnMap={mapState.showAskResultOnMap}
               />
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>
                 {mapView && (
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      px: 2,
-                      py: 1.25,
-                      display: 'flex',
-                      gap: 2,
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        AI map view
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Showing {mapView.wildfires.length.toLocaleString()} fires
-                        within {formatRadius(mapView.focusArea.radiusKm)} of{' '}
-                        {mapView.label ?? 'the selected location'}.
-                      </Typography>
-                    </Box>
-
-                    <Button
-                      size="small"
-                      onClick={() => setMapView(null)}
-                      sx={{ whiteSpace: 'nowrap' }}
-                    >
-                      Show all fires
-                    </Button>
-                  </Paper>
+                  <MapViewBanner
+                    mapView={mapView}
+                    onShowAll={mapState.showAll}
+                  />
                 )}
 
                 <Paper
@@ -221,7 +120,7 @@ function App() {
                   <WildfireMap
                     wildfires={mapWildfires}
                     selectedWildfire={selectedWildfire}
-                    onWildfireSelect={setSelectedWildfire}
+                    onWildfireSelect={mapState.changeMapSelection}
                     focusArea={mapView?.focusArea}
                   />
                 </Paper>
@@ -236,61 +135,10 @@ function App() {
   )
 }
 
-interface SummaryMetricProps {
-  label: string
-  value: number
-  color: string
-  divider?: boolean
-}
-
-function SummaryMetric({
-  label,
-  value,
-  color,
-  divider = false,
-}: SummaryMetricProps) {
-  return (
-    <Box
-      sx={{
-        px: { xs: 2, md: 2.5 },
-        py: 1.75,
-        borderLeft: {
-          xs: 'none',
-          md: divider ? '1px solid' : 'none',
-        },
-        borderColor: 'divider',
-      }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="h5"
-        sx={{
-          mt: 0.25,
-          color,
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        {value.toLocaleString()}
-      </Typography>
-    </Box>
-  )
-}
-
 function wildfireUpdateTime(wildfire: Wildfire): number {
-  const value = wildfire.statusDateUtc ?? wildfire.lastSeenInFeedUtc
-  const timestamp = Date.parse(value)
+  const timestamp = Date.parse(wildfireUpdatedUtc(wildfire))
 
   return Number.isNaN(timestamp) ? 0 : timestamp
-}
-
-function formatRadius(radiusKm: number): string {
-  return `${Math.round(radiusKm).toLocaleString()} km`
 }
 
 export default App
