@@ -41,7 +41,7 @@ function renderCamera(initialProps: CameraProps) {
   // the prop changes each test makes.
   calls.length = 0
 
-  return { ...hook, calls, mapSelectedWildfireIdRef }
+  return { ...hook, map, calls, mapSelectedWildfireIdRef }
 }
 
 const focusArea: MapFocusArea = { latitude: 50, longitude: -120, radiusKm: 40 }
@@ -98,5 +98,24 @@ describe('useWildfireMapCamera', () => {
     rerender({ selectedWildfire: fireA })
 
     expect(calls).toEqual(['flyTo', 'flyTo'])
+  })
+
+  it('resets to the default view on request, even when nothing is focused', () => {
+    // E.g. the user zoomed in by hand: no prop changes, but "Show all
+    // fires" still has to bring the map back.
+    const { result, map, calls } = renderCamera({})
+
+    result.current.resetCamera(map)
+
+    expect(calls).toEqual(['easeTo'])
+  })
+
+  it("doesn't zoom out twice when a reset also clears the focus area", () => {
+    const { result, rerender, map, calls } = renderCamera({ focusArea })
+
+    result.current.resetCamera(map)
+    rerender({ focusArea: undefined })
+
+    expect(calls).toEqual(['easeTo'])
   })
 })

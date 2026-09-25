@@ -54,11 +54,7 @@ export function useWildfireMapCamera({
       }
 
       hadFocusAreaRef.current = false
-      map.easeTo({
-        center: defaultMapCenter,
-        zoom: defaultMapZoom,
-        duration: 800,
-      })
+      easeToDefaultView(map)
       return
     }
 
@@ -125,4 +121,28 @@ export function useWildfireMapCamera({
       essential: true,
     })
   }, [mapRef, mapSelectedWildfireIdRef, selectedWildfire])
+
+  // For the "Show all fires" control. It has to work even when nothing is
+  // focused (e.g. the user just zoomed in by hand), which no prop change
+  // would signal, so it's a direct call rather than an effect.
+  function resetCamera(map: MapLibreMap) {
+    // The reset is already under way, so the focus-area effect shouldn't
+    // start the same zoom-out again when the focus is cleared.
+    hadFocusAreaRef.current = false
+    easeToDefaultView(map)
+  }
+
+  return { resetCamera }
+}
+
+// The Canada-wide view the map starts on. Also straightens out any rotation
+// or tilt, so a reset really does put everything back.
+function easeToDefaultView(map: MapLibreMap) {
+  map.easeTo({
+    center: defaultMapCenter,
+    zoom: defaultMapZoom,
+    bearing: 0,
+    pitch: 0,
+    duration: 800,
+  })
 }

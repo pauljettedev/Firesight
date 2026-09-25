@@ -14,12 +14,15 @@ vi.mock('./components/WildfireMap', () => ({
     wildfires,
     selectedWildfire,
     focusArea,
+    onReset,
   }: {
     wildfires: Wildfire[]
     selectedWildfire?: Wildfire | null
     focusArea?: MapFocusArea
+    onReset?: () => void
   }) => (
     <div data-testid="map">
+      <button onClick={onReset}>Show all fires</button>
       <span data-testid="map-fire-ids">
         {wildfires.map((wildfire) => wildfire.id).join(',')}
       </span>
@@ -104,8 +107,11 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show all fires' }))
 
+    // A full reset: every fire, nothing focused, nothing selected.
     expect(mapFireIds).toHaveTextContent('fire-a,fire-b,fire-c')
     expect(screen.getByTestId('map-focus')).toBeEmptyDOMElement()
+    expect(screen.getByTestId('map-selected-id')).toBeEmptyDOMElement()
+    expect(row).not.toHaveAttribute('aria-current')
     expect(
       screen.queryByRole('status', { name: 'Map view' }),
     ).not.toBeInTheDocument()

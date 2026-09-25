@@ -1,26 +1,40 @@
+/*
+ * The map's colours, defined once on the map container so the MapLibre
+ * controls (including our "Show all fires" one) and the popups, which
+ * MapLibre places inside the container, all stay in step.
+ */
 .firesight-map {
-  background: #0d141b;
+  --map-background: #0d141b;
+  --map-surface: #121c25;
+  --map-surface-hover: #1a2834;
+  --map-border: rgba(143, 164, 179, 0.28);
+  --map-divider: rgba(143, 164, 179, 0.18);
+  --map-text: #eef4f7;
+  --map-text-muted: #8fa4b3;
+  --map-accent: #41d9e8;
+
+  background: var(--map-background);
 }
 
 .firesight-map .maplibregl-ctrl-group {
   overflow: hidden;
-  border: 1px solid rgba(143, 164, 179, 0.28);
+  border: 1px solid var(--map-border);
   border-radius: 6px;
-  background: #121c25;
+  background: var(--map-surface);
   box-shadow: none;
 }
 
 .firesight-map .maplibregl-ctrl-group button {
-  background-color: #121c25;
+  background-color: var(--map-surface);
 }
 
 .firesight-map .maplibregl-ctrl-group button + button {
-  border-top-color: rgba(143, 164, 179, 0.18);
+  border-top-color: var(--map-divider);
 }
 
 .firesight-map .maplibregl-ctrl-group button:not(:disabled):hover,
 .firesight-map .maplibregl-ctrl-group button:not(:disabled):active {
-  background-color: #1a2834;
+  background-color: var(--map-surface-hover);
 }
 
 .firesight-map .maplibregl-ctrl-icon {
@@ -28,23 +42,37 @@
   opacity: 0.82;
 }
 
+/*
+ * The "Show all fires" control is a text button, so unlike MapLibre's
+ * square icon buttons it sizes to its label.
+ */
+.firesight-map .firesight-reset-control button {
+  width: auto;
+  padding: 0 10px;
+  color: var(--map-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .firesight-map .maplibregl-ctrl-attrib {
-  color: #8fa4b3;
+  color: var(--map-text-muted);
   background: rgba(13, 20, 27, 0.88);
 }
 
 .firesight-map .maplibregl-ctrl-attrib a {
-  color: #41d9e8;
+  color: var(--map-accent);
 }
 
 .firesight-popup .maplibregl-popup-content {
   min-width: 260px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid rgba(143, 164, 179, 0.28);
+  border: 1px solid var(--map-border);
   border-radius: 6px;
-  color: #eef4f7;
-  background: #121c25;
+  color: var(--map-text);
+  background: var(--map-surface);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.36);
 }
 
@@ -54,28 +82,28 @@
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  color: #8fa4b3;
+  color: var(--map-text-muted);
   font-size: 20px;
   line-height: 28px;
 }
 
 .firesight-popup .maplibregl-popup-close-button:hover {
-  color: #eef4f7;
+  color: var(--map-text);
   background: rgba(143, 164, 179, 0.12);
 }
 
 .firesight-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
-  border-top-color: #121c25;
+  border-top-color: var(--map-surface);
 }
 
 .firesight-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip {
-  border-bottom-color: #121c25;
+  border-bottom-color: var(--map-surface);
 }
 
 .firesight-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
-  border-right-color: #121c25;
+  border-right-color: var(--map-surface);
 }
 
 .firesight-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
-  border-left-color: #121c25;
+  border-left-color: var(--map-surface);
 }

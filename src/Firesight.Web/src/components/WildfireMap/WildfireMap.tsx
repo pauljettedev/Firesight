@@ -24,6 +24,7 @@ import {
   selectionLayerId,
   sourceId,
 } from './wildfireMapLayers'
+import { ResetViewControl } from './ResetViewControl'
 import { WildfirePopup } from './WildfirePopup'
 
 // MapLibre works out its worker script's URL at runtime by guessing it sits
@@ -38,9 +39,14 @@ interface WildfireMapProps {
   wildfires: Wildfire[]
   selectedWildfire?: Wildfire | null
   onWildfireSelect?: (wildfire: Wildfire | null) => void
+  // Called by the "Show all fires" button, after the map has started
+  // moving its camera back to the full view.
+  onReset?: () => void
   focusArea?: MapFocusArea
 }
 
+// MapLibre draws from GeoJSON, not our Wildfire objects. The popup is built
+// from these properties, so everything it shows has to be copied in here.
 function toGeoJson(wildfires: Wildfire[]) {
   return {
     type: 'FeatureCollection' as const,
@@ -64,6 +70,8 @@ function toGeoJson(wildfires: Wildfire[]) {
   }
 }
 
+// Bigger fires get bigger dots, but the growth flattens out so a handful of
+// huge fires don't cover everything around them.
 const circleRadius: ExpressionSpecification = [
   'interpolate',
   ['linear'],
@@ -78,6 +86,7 @@ export function WildfireMap({
   wildfires,
   selectedWildfire,
   onWildfireSelect,
+  onReset,
   focusArea,
 }: WildfireMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -85,8 +94,14 @@ export function WildfireMap({
   const wildfiresRef = useRef(wildfires)
   const selectedWildfireRef = useRef(selectedWildfire)
   const onWildfireSelectRef = useRef(onWildfireSelect)
+  // What the "Show all fires" control does when clicked. Kept in a ref for
+  // the same reason as the others: the control is created once, with the
+  // map, but has to call the latest version.
+  const resetRef = useRef<(map: MapLibreMap) => void>(() => {})
   const activePopupRef = useRef<maplibregl.Popup | null>(null)
   const activePopupWildfireIdRef = useRef<string | null>(null)
+  // Set when a fire is picked by clicking its dot, so the camera knows the
+  // map is already looking at it and doesn't need to fly there.
   const mapSelectedWildfireIdRef = useRef<string | null>(null)
 
   // The map below is created once and its click handler is set up only
@@ -111,6 +126,9 @@ export function WildfireMap({
       return
     }
 
+    // Created once and kept for the life of the component. Rebuilding a
+    // MapLibre map is slow and resets the view, so prop changes are applied
+    // to this one map by the effects further down instead.
     const map = new maplibregl.Map({
       container: containerRef.current,
       center: defaultMapCenter,
@@ -130,6 +148,8 @@ export function WildfireMap({
             id: 'osm',
             type: 'raster',
             source: 'osm',
+            // Muted and darkened so the base map sits back and the
+            // coloured fire dots stand out against the dark theme.
             paint: {
               'raster-saturation': -0.35,
               'raster-contrast': 0.28,
@@ -142,6 +162,7 @@ export function WildfireMap({
     })
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
+    map.addControl(new ResetViewControl(() => resetRef.current(map)), 'top-left')
 
     map.on('load', () => {
       map.addSource(sourceId, {
@@ -164,6 +185,8 @@ export function WildfireMap({
             'EX', '#8796a1',
             '#8e78b5',
           ],
+          // Fires not seen in the feed recently are faded, so it's clear
+          // their details may be out of date.
           'circle-stroke-color': '#eef4f7',
           'circle-stroke-width': [
             'case',
@@ -180,6 +203,9 @@ export function WildfireMap({
         },
       })
 
+      // The ring around the selected fire is a second layer over the same
+      // data, filtered down to one fire. Selecting a different fire is then
+      // just a filter change, with no need to restyle every dot.
       map.addLayer({
         id: selectionLayerId,
         type: 'circle',
@@ -207,11 +233,15 @@ export function WildfireMap({
           wildfiresRef.current.find((wildfire) => wildfire.id === selectedId) ??
           null
 
+        // Only one popup open at a time.
         activePopupRef.current?.remove()
         map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
         mapSelectedWildfireIdRef.current = selectedId
         onWildfireSelectRef.current?.(selected)
 
+        // MapLibre popups take a plain DOM element, so the React popup is
+        // rendered into one. flushSync finishes that render before MapLibre
+        // measures the element to position the popup.
         const popupContent = document.createElement('div')
         const popupRoot = createRoot(popupContent)
 
@@ -244,10 +274,6 @@ export function WildfireMap({
         popup.on('close', () => {
           popupRoot.unmount()
 
-          if (activePopupRef.current !== popup) {
-            return
-          }
-
           activePopupRef.current = null
           activePopupWildfireIdRef.current = null
           map.setFilter(selectionLayerId, [
@@ -256,6 +282,10 @@ export function WildfireMap({
             noSelectionId,
           ])
 
+          // Closing the popup (its X, or a click elsewhere on the map)
+          // deselects its fire. But picking a different fire, e.g. from the
+          // Recent list, also closes it, and by then the selection has moved
+          // on to the new fire, which mustn't be cleared.
           if (selectedWildfireRef.current?.id === selectedId) {
             onWildfireSelectRef.current?.(null)
           }
@@ -289,6 +319,8 @@ export function WildfireMap({
       return
     }
 
+    // Swaps the data on the existing map rather than rebuilding it, so the
+    // view, controls and any open popup stay put.
     const source = map.getSource(sourceId) as GeoJSONSource | undefined
     source?.setData(toGeoJson(wildfires))
   }, [wildfires])
@@ -312,11 +344,20 @@ export function WildfireMap({
     map.setFilter(selectionLayerId, ['==', ['get', 'id'], selectedId])
   }, [selectedWildfire])
 
-  useWildfireMapCamera({
+  const { resetCamera } = useWildfireMapCamera({
     mapRef,
     focusArea,
     selectedWildfire,
     mapSelectedWildfireIdRef,
+  })
+
+  // No dependency list: onReset is a new function on every render, so this
+  // would re-run every time anyway.
+  useEffect(() => {
+    resetRef.current = (map) => {
+      resetCamera(map)
+      onReset?.()
+    }
   })
 
   return (

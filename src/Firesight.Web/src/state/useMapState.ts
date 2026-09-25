@@ -57,7 +57,7 @@ export function useMapState() {
       changeView({ type: 'focusWildfire', wildfire }),
     selectWildfire: (wildfire: Wildfire) =>
       changeView({ type: 'selectWildfire', wildfire }),
-    showAll: () => changeView({ type: 'showAll' }),
+    resetMap: () => changeView({ type: 'resetMap' }),
     // Picking a fire on the map is a selection within the current view, not
     // a new view, so it doesn't cancel a pending Ask AI lookup.
     changeMapSelection: (wildfire: Wildfire | null) =>

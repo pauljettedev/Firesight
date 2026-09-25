@@ -20,6 +20,8 @@ import { wildfireUpdatedUtc } from './utils/wildfirePresentation'
 
 function App() {
   const [wildfires, setWildfires] = useState<Wildfire[]>([])
+  // What the map shows and which fire is selected. The rules for how user
+  // actions change these live in state/mapState.ts.
   const mapState = useMapState()
   const { mapView, selectedWildfire } = mapState
   const [loading, setLoading] = useState(true)
@@ -34,6 +36,8 @@ function App() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Sorts a copy because sort() changes the array in place, and the fires
+  // array is React state, which must never be changed in place.
   const recentWildfires = useMemo(
     () =>
       [...wildfires]
@@ -101,10 +105,7 @@ function App() {
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>
                 {mapView && (
-                  <MapViewBanner
-                    mapView={mapView}
-                    onShowAll={mapState.showAll}
-                  />
+                  <MapViewBanner mapView={mapView} />
                 )}
 
                 <Paper
@@ -121,6 +122,7 @@ function App() {
                     wildfires={mapWildfires}
                     selectedWildfire={selectedWildfire}
                     onWildfireSelect={mapState.changeMapSelection}
+                    onReset={mapState.resetMap}
                     focusArea={mapView?.focusArea}
                   />
                 </Paper>

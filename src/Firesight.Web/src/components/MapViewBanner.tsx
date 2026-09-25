@@ -1,4 +1,4 @@
-import { Box, Button, Paper, Typography } from '@mui/material'
+import { Paper, Typography } from '@mui/material'
 import type { MapView } from '../utils/mapView'
 import {
   formatArea,
@@ -8,10 +8,11 @@ import {
 
 interface MapViewBannerProps {
   mapView: MapView
-  onShowAll: () => void
 }
 
-export function MapViewBanner({ mapView, onShowAll }: MapViewBannerProps) {
+// Says what the map is narrowed to. Going back to every fire is the map's
+// own "Show all fires" button, which is always there.
+export function MapViewBanner({ mapView }: MapViewBannerProps) {
   const { title, description } = describeMapView(mapView)
 
   return (
@@ -22,27 +23,14 @@ export function MapViewBanner({ mapView, onShowAll }: MapViewBannerProps) {
       role="status"
       aria-label="Map view"
       variant="outlined"
-      sx={{
-        px: 2,
-        py: 1.25,
-        display: 'flex',
-        gap: 2,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
+      sx={{ px: 2, py: 1.25 }}
     >
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-          {title}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {description}
-        </Typography>
-      </Box>
-
-      <Button size="small" onClick={onShowAll} sx={{ whiteSpace: 'nowrap' }}>
-        Show all fires
-      </Button>
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+        {title}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {description}
+      </Typography>
     </Paper>
   )
 }

@@ -71,15 +71,15 @@ describe('mapStateReducer', () => {
     expect(state.selectedWildfire).toBe(fireB)
   })
 
-  it('showAll clears the view but keeps the selected fire highlighted', () => {
+  it('resetMap goes back to every fire with nothing selected', () => {
     const focused = mapStateReducer(initialMapState, {
       type: 'focusWildfire',
       wildfire: fireA,
     })
 
-    const state = mapStateReducer(focused, { type: 'showAll' })
+    const state = mapStateReducer(focused, { type: 'resetMap' })
 
     expect(state.mapView).toBeNull()
-    expect(state.selectedWildfire).toBe(fireA)
+    expect(state.selectedWildfire).toBeNull()
   })
 })

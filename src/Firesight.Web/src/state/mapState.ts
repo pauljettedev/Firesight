@@ -29,8 +29,9 @@ export type MapAction =
   // A dot was clicked on the map, or its popup was closed (null). Whatever
   // the map is showing stays as it is.
   | { type: 'mapSelectionChanged'; wildfire: Wildfire | null }
-  // "Show all fires" in the banner. The highlighted fire stays highlighted.
-  | { type: 'showAll' }
+  // The map's "Show all fires" button: a full reset, back to every fire
+  // with nothing selected.
+  | { type: 'resetMap' }
 
 export const initialMapState: MapState = {
   mapView: null,
@@ -64,7 +65,7 @@ export function mapStateReducer(state: MapState, action: MapAction): MapState {
       }
 
       return { ...state, selectedWildfire: action.wildfire }
-    case 'showAll':
-      return { ...state, mapView: null }
+    case 'resetMap':
+      return initialMapState
   }
 }
