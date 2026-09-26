@@ -80,6 +80,12 @@ One-time setup:
    - `DEPLOY_HOST`: the server's IP address
    - `DEPLOY_USER`: the SSH user that owns `~/Firesight`
    - `DEPLOY_SSH_KEY`: the contents of the private key `~/.ssh/firesight-deploy` (not `.pub`)
+   - `DEPLOY_HOST_FINGERPRINT`: the server's identity, so CI only ever connects to it. Get it
+     on the server with
+     `ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub | cut -d ' ' -f2` (it starts with
+     `SHA256:`). It must be the ECDSA key: the deploy action's SSH library (Go's
+     `golang.org/x/crypto`) asks for ECDSA first, then RSA, then Ed25519, and the server
+     answers with the first one it has. If there's no ECDSA key, use the RSA one.
 3. Delete the private key from the server: `rm ~/.ssh/firesight-deploy`. GitHub keeps the only
    copy it needs.
 4. On the **Variables** tab, add `DEPLOY_ENABLED` = `true`.

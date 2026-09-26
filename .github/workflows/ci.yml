@@ -77,11 +77,17 @@ jobs:
 
     steps:
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
+        # Pinned to a commit, not the movable v1 tag, because this action is
+        # given the server's SSH key. To update, pick a newer release's commit.
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Refuse to connect unless the server proves it's the droplet.
+          fingerprint: ${{ secrets.DEPLOY_HOST_FINGERPRINT }}
+          # A full rebuild on the droplet can run past the 10 minute default.
+          command_timeout: 20m
           script: |
             # Stop at the first failing command, so a failed build fails the
             # deploy instead of being hidden by the cleanup step after it.
