@@ -69,6 +69,11 @@ jobs:
       github.ref == 'refs/heads/main' && github.event_name == 'push' &&
       vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
+    # One deploy at a time. A second push waits for the first deploy to finish
+    # instead of running against the same server folder at the same time.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
 
     steps:
       - name: Deploy over SSH
@@ -78,7 +83,13 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            # Stop at the first failing command, so a failed build fails the
+            # deploy instead of being hidden by the cleanup step after it.
+            set -e
             cd Firesight
             git fetch origin main
             git reset --hard origin/main
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            # Each build leaves the previous image behind. Remove images no
+            # container uses so they don't fill the droplet's disk.
+            docker image prune -f

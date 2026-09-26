@@ -65,7 +65,8 @@ docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 ## Continuous deployment
 
 When `DEPLOY_ENABLED` is on, every push to `main` that passes CI runs the update commands
-above over SSH (the `deploy` job in `.github/workflows/ci.yml`).
+above over SSH (the `deploy` job in `.github/workflows/ci.yml`), then removes unused Docker
+images so old builds don't fill the disk. Deploys run one at a time.
 
 One-time setup:
 
