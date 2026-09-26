@@ -12,11 +12,14 @@ interface WildfireContextRailProps {
   wildfires: Wildfire[]
   recentWildfires: Wildfire[]
   selectedWildfireId: string | null
-  // Recent and Ask AI both narrow the map to the fire that was clicked.
+  // Map actions, named after the useMapState function each one calls.
+  // Recent and Ask AI: narrow the map to the clicked fire.
   onFocusWildfire: (wildfire: Wildfire) => void
-  onNearbyWildfireSelect: (wildfire: Wildfire) => void
-  onShowAskAreaOnMap: (context: AskFiresightMapContext) => Promise<void>
-  onShowAskWildfiresOnMap: (wildfires: Wildfire[]) => void
+  // Nearby: highlight the clicked fire, keeping every fire on the map.
+  onSelectWildfire: (wildfire: Wildfire) => void
+  // Ask AI: show the area an answer searched, or the fires it named.
+  onShowArea: (context: AskFiresightMapContext) => Promise<void>
+  onShowWildfires: (wildfires: Wildfire[]) => void
 }
 
 export function WildfireContextRail({
@@ -24,9 +27,9 @@ export function WildfireContextRail({
   recentWildfires,
   selectedWildfireId,
   onFocusWildfire,
-  onNearbyWildfireSelect,
-  onShowAskAreaOnMap,
-  onShowAskWildfiresOnMap,
+  onSelectWildfire,
+  onShowArea,
+  onShowWildfires,
 }: WildfireContextRailProps) {
   const [mode, setMode] = useState<RailMode>('ask')
 
@@ -72,7 +75,7 @@ export function WildfireContextRail({
         <Box sx={{ display: mode === 'nearby' ? 'block' : 'none' }}>
           <NearbyWildfireSearch
             selectedWildfireId={selectedWildfireId}
-            onSelect={onNearbyWildfireSelect}
+            onSelect={onSelectWildfire}
           />
         </Box>
 
@@ -80,9 +83,9 @@ export function WildfireContextRail({
           <AskFiresightPanel
             wildfires={wildfires}
             selectedWildfireId={selectedWildfireId}
-            onShowAreaOnMap={onShowAskAreaOnMap}
-            onShowWildfiresOnMap={onShowAskWildfiresOnMap}
-            onWildfireSelect={onFocusWildfire}
+            onShowArea={onShowArea}
+            onShowWildfires={onShowWildfires}
+            onFocusWildfire={onFocusWildfire}
           />
         </Box>
       </Box>

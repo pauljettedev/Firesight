@@ -1,8 +1,9 @@
 namespace Firesight.Application.AskFiresight;
 
-// WildfireExternalIds: the CWFIS IDs of the fires the answer mentions, in the
-// order they're mentioned, so the UI can show them on the map. Only IDs that
-// came back from Firesight's own tools count, so the model can't invent one.
+// WildfireExternalIds: the CWFIS IDs of the fires the answer is about, in
+// display order, so the UI can list them and show them on the map. Claude
+// names them, and only IDs that match fires Firesight's own tools returned
+// are kept, so the model can't invent one.
 public sealed record AskFiresightResult(
     string Answer,
     IReadOnlyList<string> ToolsUsed,

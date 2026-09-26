@@ -497,14 +497,14 @@ public sealed class ClaudeAskFiresightServiceTests
                 "get_active_wildfires",
                 """{"status":null,"responseMode":"records"}"""),
             // Claude's IDs are claims: one in the wrong case with stray spaces,
-            // one repeated, and one no tool returned.
+            // one repeated, one no tool returned, and two that aren't text.
             CreateFunctionCallResponse(
                 "call-2",
                 "answer",
                 """
                 {
                   "text": "The two largest fires are:",
-                  "wildfireIds": [" 2026_on_test_002 ", "2026_ON_TEST_001", "2026_XX_MADE_UP", "2026_ON_TEST_001"]
+                  "wildfireIds": [" 2026_on_test_002 ", "2026_ON_TEST_001", "2026_XX_MADE_UP", "2026_ON_TEST_001", 42, null]
                 }
                 """));
 

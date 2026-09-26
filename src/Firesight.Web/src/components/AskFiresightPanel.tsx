@@ -31,12 +31,12 @@ const exampleQuestions = [
 interface AskFiresightPanelProps {
   wildfires: Wildfire[]
   selectedWildfireId: string | null
-  onShowAreaOnMap: (context: AskFiresightMapContext) => Promise<void>
-  onShowWildfiresOnMap: (wildfires: Wildfire[]) => void
-  onWildfireSelect: (wildfire: Wildfire) => void
+  onShowArea: (context: AskFiresightMapContext) => Promise<void>
+  onShowWildfires: (wildfires: Wildfire[]) => void
+  onFocusWildfire: (wildfire: Wildfire) => void
 }
 
-export function AskFiresightPanel(answerProps: AskFiresightPanelProps) {
+export function AskFiresightPanel(props: AskFiresightPanelProps) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState<AskFiresightResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -159,7 +159,7 @@ export function AskFiresightPanel(answerProps: AskFiresightPanelProps) {
 
           {error && <Alert severity="error">{error}</Alert>}
 
-          {result && <AskFiresightAnswer result={result} {...answerProps} />}
+          {result && <AskFiresightAnswer result={result} {...props} />}
         </Stack>
       </Box>
     </Box>

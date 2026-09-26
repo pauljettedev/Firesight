@@ -31,9 +31,9 @@ interface AskFiresightAnswerProps {
   // details come from the Firesight API rather than the answer text.
   wildfires: Wildfire[]
   selectedWildfireId: string | null
-  onShowAreaOnMap: (context: AskFiresightMapContext) => Promise<void>
-  onShowWildfiresOnMap: (wildfires: Wildfire[]) => void
-  onWildfireSelect: (wildfire: Wildfire) => void
+  onShowArea: (context: AskFiresightMapContext) => Promise<void>
+  onShowWildfires: (wildfires: Wildfire[]) => void
+  onFocusWildfire: (wildfire: Wildfire) => void
 }
 
 // One Ask Firesight answer: the text, the fires it names (clickable, like the
@@ -43,9 +43,9 @@ export function AskFiresightAnswer({
   result,
   wildfires,
   selectedWildfireId,
-  onShowAreaOnMap,
-  onShowWildfiresOnMap,
-  onWildfireSelect,
+  onShowArea,
+  onShowWildfires,
+  onFocusWildfire,
 }: AskFiresightAnswerProps) {
   const [mapLoading, setMapLoading] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
@@ -55,12 +55,12 @@ export function AskFiresightAnswer({
     result.wildfireExternalIds,
   )
 
-  async function showAreaOnMap(context: AskFiresightMapContext) {
+  async function handleShowArea(context: AskFiresightMapContext) {
     setMapLoading(true)
     setMapError(null)
 
     try {
-      await onShowAreaOnMap(context)
+      await onShowArea(context)
     } catch (err: unknown) {
       setMapError(errorMessage(err, 'Firesight failed to update the map.'))
     } finally {
@@ -77,29 +77,29 @@ export function AskFiresightAnswer({
         {result.answer}
       </Typography>
 
-      {answerWildfires.length > 0 && (
-        <WildfireList
-          wildfires={answerWildfires}
-          selectedWildfireId={selectedWildfireId}
-          onSelect={onWildfireSelect}
-          limit={MaxListedWildfires}
-          sx={{ mt: 1.5 }}
-        />
-      )}
-
-      {/* An answer that names fires shows exactly those. Otherwise an answer
-          about a place shows the area that was searched. */}
+      {/* An answer that names fires lists them and can show exactly those.
+          Otherwise an answer about a place can show the area it searched. */}
       {answerWildfires.length > 0 ? (
-        <ShowOnMapButton onClick={() => onShowWildfiresOnMap(answerWildfires)}>
-          {answerWildfires.length === 1
-            ? 'Show fire on map'
-            : `Show all ${answerWildfires.length} fires on map`}
-        </ShowOnMapButton>
+        <>
+          <WildfireList
+            wildfires={answerWildfires}
+            selectedWildfireId={selectedWildfireId}
+            onSelect={onFocusWildfire}
+            limit={MaxListedWildfires}
+            sx={{ mt: 1.5 }}
+          />
+
+          <ShowOnMapButton onClick={() => onShowWildfires(answerWildfires)}>
+            {answerWildfires.length === 1
+              ? 'Show fire on map'
+              : `Show all ${answerWildfires.length} fires on map`}
+          </ShowOnMapButton>
+        </>
       ) : (
         result.mapContext && (
           <ShowOnMapButton
             disabled={mapLoading}
-            onClick={() => void showAreaOnMap(result.mapContext!)}
+            onClick={() => void handleShowArea(result.mapContext!)}
           >
             {mapLoading ? (
               <CircularProgress size={16} color="inherit" />

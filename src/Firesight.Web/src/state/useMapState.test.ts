@@ -32,7 +32,7 @@ describe('useMapState', () => {
     ])
     const { result } = renderHook(() => useMapState())
 
-    await act(() => result.current.showAskAreaOnMap(askContext))
+    await act(() => result.current.showArea(askContext))
 
     expect(result.current.mapView).toMatchObject({
       kind: 'area',
@@ -53,7 +53,7 @@ describe('useMapState', () => {
 
     let lookup!: Promise<void>
     act(() => {
-      lookup = result.current.showAskAreaOnMap(askContext)
+      lookup = result.current.showArea(askContext)
     })
     act(() => {
       result.current.focusWildfire(recentFire)

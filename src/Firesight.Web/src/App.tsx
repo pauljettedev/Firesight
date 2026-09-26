@@ -101,9 +101,9 @@ function App() {
                 recentWildfires={recentWildfires}
                 selectedWildfireId={selectedWildfire?.id ?? null}
                 onFocusWildfire={mapState.focusWildfire}
-                onNearbyWildfireSelect={mapState.selectWildfire}
-                onShowAskAreaOnMap={mapState.showAskAreaOnMap}
-                onShowAskWildfiresOnMap={mapState.showWildfires}
+                onSelectWildfire={mapState.selectWildfire}
+                onShowArea={mapState.showArea}
+                onShowWildfires={mapState.showWildfires}
               />
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>

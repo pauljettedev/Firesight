@@ -674,7 +674,11 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
 
         foreach (var claimedId in claimedIds.EnumerateArray())
         {
-            var id = claimedId.GetString()?.Trim() ?? string.Empty;
+            // The tool schema asks for strings, but Claude isn't forced to
+            // follow it. Anything else (a number, null) counts as no match.
+            var id = claimedId.ValueKind == JsonValueKind.String
+                ? claimedId.GetString()!.Trim()
+                : claimedId.GetRawText();
 
             if (!returnedIds.TryGetValue(id, out var realId))
             {

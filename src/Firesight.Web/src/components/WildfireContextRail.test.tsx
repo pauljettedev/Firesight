@@ -34,9 +34,9 @@ describe('WildfireContextRail', () => {
         recentWildfires={[first, second]}
         selectedWildfireId={null}
         onFocusWildfire={onFocusWildfire}
-        onNearbyWildfireSelect={vi.fn()}
-        onShowAskAreaOnMap={vi.fn()}
-        onShowAskWildfiresOnMap={vi.fn()}
+        onSelectWildfire={vi.fn()}
+        onShowArea={vi.fn()}
+        onShowWildfires={vi.fn()}
       />,
     )
 

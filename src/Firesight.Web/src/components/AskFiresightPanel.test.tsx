@@ -35,9 +35,9 @@ function answer(overrides: Partial<AskFiresightResult>): AskFiresightResult {
 }
 
 describe('AskFiresightPanel', () => {
-  const onShowOnMap = vi.fn()
-  const onShowWildfiresOnMap = vi.fn()
-  const onWildfireSelect = vi.fn()
+  const onShowArea = vi.fn()
+  const onShowWildfires = vi.fn()
+  const onFocusWildfire = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -49,9 +49,9 @@ describe('AskFiresightPanel', () => {
       <AskFiresightPanel
         wildfires={[fireK1, fireK12]}
         selectedWildfireId={null}
-        onShowAreaOnMap={onShowOnMap}
-        onShowWildfiresOnMap={onShowWildfiresOnMap}
-        onWildfireSelect={onWildfireSelect}
+        onShowArea={onShowArea}
+        onShowWildfires={onShowWildfires}
+        onFocusWildfire={onFocusWildfire}
       />,
     )
     await user.type(
@@ -73,12 +73,12 @@ describe('AskFiresightPanel', () => {
       .toEqual(['2026_BC_K12', '2026_BC_K1'])
 
     await user.click(rows[0])
-    expect(onWildfireSelect).toHaveBeenCalledWith(fireK12)
+    expect(onFocusWildfire).toHaveBeenCalledWith(fireK12)
 
     await user.click(
       screen.getByRole('button', { name: 'Show all 2 fires on map' }),
     )
-    expect(onShowWildfiresOnMap).toHaveBeenCalledWith([fireK12, fireK1])
+    expect(onShowWildfires).toHaveBeenCalledWith([fireK12, fireK1])
   })
 
   it('offers the fire an answer names, even when it also searched an area', async () => {
