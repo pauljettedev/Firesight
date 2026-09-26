@@ -75,7 +75,8 @@ One-time setup:
    ssh-keygen -t ed25519 -f ~/.ssh/firesight-deploy -N ""
    cat ~/.ssh/firesight-deploy.pub >> ~/.ssh/authorized_keys
    ```
-2. In GitHub, go to **Settings → Secrets and variables → Actions** and add these secrets:
+2. In the repository's **Settings** tab on GitHub (not your account settings), go to
+   **Secrets and variables → Actions** and add these secrets:
    - `DEPLOY_HOST`: the server's IP address
    - `DEPLOY_USER`: the SSH user that owns `~/Firesight`
    - `DEPLOY_SSH_KEY`: the contents of the private key `~/.ssh/firesight-deploy` (not `.pub`)
