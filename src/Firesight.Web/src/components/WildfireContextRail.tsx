@@ -14,6 +14,7 @@ interface WildfireContextRailProps {
   onRecentWildfireSelect: (wildfire: Wildfire) => void
   onNearbyWildfireSelect: (wildfire: Wildfire) => void
   onShowAskResultOnMap: (context: AskFiresightMapContext) => Promise<void>
+  onShowAskWildfiresOnMap: (externalIds: string[]) => void
 }
 
 export function WildfireContextRail({
@@ -22,6 +23,7 @@ export function WildfireContextRail({
   onRecentWildfireSelect,
   onNearbyWildfireSelect,
   onShowAskResultOnMap,
+  onShowAskWildfiresOnMap,
 }: WildfireContextRailProps) {
   const [mode, setMode] = useState<RailMode>('ask')
 
@@ -72,7 +74,10 @@ export function WildfireContextRail({
         </Box>
 
         <Box sx={{ display: mode === 'ask' ? 'block' : 'none' }}>
-          <AskFiresightPanel onShowOnMap={onShowAskResultOnMap} />
+          <AskFiresightPanel
+            onShowOnMap={onShowAskResultOnMap}
+            onShowWildfiresOnMap={onShowAskWildfiresOnMap}
+          />
         </Box>
       </Box>
     </Paper>

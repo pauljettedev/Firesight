@@ -82,4 +82,38 @@ describe('mapStateReducer', () => {
     expect(state.mapView).toBeNull()
     expect(state.selectedWildfire).toBeNull()
   })
+
+  it('showWildfires narrows the map to those fires and clears any selection', () => {
+    const selected = { ...initialMapState, selectedWildfire: fireA }
+
+    const state = mapStateReducer(selected, {
+      type: 'showWildfires',
+      wildfires: [fireA, fireB],
+    })
+
+    expect(state.mapView).toMatchObject({
+      kind: 'wildfires',
+      wildfires: [fireA, fireB],
+    })
+    expect(state.selectedWildfire).toBeNull()
+  })
+
+  it('showWildfires with one fire focuses and selects it, like the Recent tab', () => {
+    const state = mapStateReducer(initialMapState, {
+      type: 'showWildfires',
+      wildfires: [fireB],
+    })
+
+    expect(state.mapView).toMatchObject({ kind: 'wildfire', wildfire: fireB })
+    expect(state.selectedWildfire).toBe(fireB)
+  })
+
+  it('showWildfires with no fires leaves the map as it is', () => {
+    const state = mapStateReducer(areaState, {
+      type: 'showWildfires',
+      wildfires: [],
+    })
+
+    expect(state).toBe(areaState)
+  })
 })

@@ -1,6 +1,7 @@
 import type { Wildfire } from '../services/wildfireService'
 import {
   createSingleWildfireView,
+  createWildfiresView,
   type MapFocusArea,
   type MapView,
 } from '../utils/mapView'
@@ -22,6 +23,8 @@ export type MapAction =
       wildfires: Wildfire[]
       label: string | null
     }
+  // Ask AI "Show on map": narrow to the fires the answer names.
+  | { type: 'showWildfires'; wildfires: Wildfire[] }
   // Recent tab: narrow the map to just this fire.
   | { type: 'focusWildfire'; wildfire: Wildfire }
   // Nearby tab: show every fire again, with this one highlighted.
@@ -48,6 +51,23 @@ export function mapStateReducer(state: MapState, action: MapAction): MapState {
           wildfires: action.wildfires,
           label: action.label,
         },
+        selectedWildfire: null,
+      }
+    case 'showWildfires':
+      if (action.wildfires.length === 0) {
+        return state
+      }
+
+      // One fire gets the same view as picking it from the Recent tab.
+      if (action.wildfires.length === 1) {
+        return mapStateReducer(state, {
+          type: 'focusWildfire',
+          wildfire: action.wildfires[0],
+        })
+      }
+
+      return {
+        mapView: createWildfiresView(action.wildfires),
         selectedWildfire: null,
       }
     case 'focusWildfire':

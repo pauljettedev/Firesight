@@ -489,6 +489,98 @@ public sealed class ClaudeAskFiresightServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_ReturnsIdsOfReturnedFiresTheAnswerMentions_InAnswerOrder()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "get_active_wildfires",
+                """{"status":null,"responseMode":"records"}"""),
+            // Mentions two returned fires (out of ID order) and one ID no tool
+            // returned. The made-up one must not reach the map.
+            CreateAnswerResponse(
+                "Largest: 2026_ON_TEST_002, then 2026_ON_TEST_001, then 2026_XX_MADE_UP."));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.GetActiveWildfiresAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    CreateWildfire("2026_ON_TEST_001"),
+                    CreateWildfire("2026_ON_TEST_002"),
+                    CreateWildfire("2026_ON_TEST_003")
+                ]);
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            Mock.Of<ILocationGeocoder>());
+
+        var result = await service.AskAsync("What are the two largest fires?");
+
+        Assert.Equal(
+            ["2026_ON_TEST_002", "2026_ON_TEST_001"],
+            result.WildfireExternalIds);
+    }
+
+    [Fact]
+    public async Task AskAsync_DoesNotMatchAnIdInsideALongerId()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "get_active_wildfires",
+                """{"status":null,"responseMode":"records"}"""),
+            CreateAnswerResponse("The largest is 2026_BC_K12."));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.GetActiveWildfiresAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                [
+                    CreateWildfire("2026_BC_K1"),
+                    CreateWildfire("2026_BC_K12")
+                ]);
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            Mock.Of<ILocationGeocoder>());
+
+        var result = await service.AskAsync("What is the largest fire?");
+
+        Assert.Equal(["2026_BC_K12"], result.WildfireExternalIds);
+    }
+
+    [Fact]
+    public async Task AskAsync_ReturnsTheFireForADeterministicStatusAnswer()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "get_wildfire_by_external_id",
+                """{"externalId":"2026_ON_TEST_001","responseMode":"status"}"""));
+
+        var wildfireService = new Mock<IWildfireService>();
+        wildfireService
+            .Setup(service => service.GetWildfireByExternalIdAsync(
+                "2026_ON_TEST_001",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateWildfire("2026_ON_TEST_001"));
+
+        var service = CreateService(
+            client.Object,
+            wildfireService.Object,
+            Mock.Of<ILocationGeocoder>());
+
+        var result = await service.AskAsync("What is the status of 2026_ON_TEST_001?");
+
+        Assert.Equal(["2026_ON_TEST_001"], result.WildfireExternalIds);
+    }
+
+    [Fact]
     public async Task AskAsync_StopsAfterFourToolCallRounds()
     {
         var client = new Mock<IClaudeMessagesClient>();

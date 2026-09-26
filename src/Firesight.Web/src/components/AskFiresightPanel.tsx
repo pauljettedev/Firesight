@@ -34,10 +34,12 @@ const toolLabels: Record<string, string> = {
 
 interface AskFiresightPanelProps {
   onShowOnMap: (context: AskFiresightMapContext) => Promise<void>
+  onShowWildfiresOnMap: (externalIds: string[]) => void
 }
 
 export function AskFiresightPanel({
   onShowOnMap,
+  onShowWildfiresOnMap,
 }: AskFiresightPanelProps) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState<AskFiresightResult | null>(null)
@@ -209,7 +211,24 @@ export function AskFiresightPanel({
                 {result.answer}
               </Typography>
 
-              {result.mapContext && (
+              {/* An answer that names fires shows exactly those. Otherwise an
+                  answer about a place shows the area that was searched. */}
+              {result.wildfireExternalIds.length > 0 ? (
+                <Button
+                  type="button"
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                  onClick={() =>
+                    onShowWildfiresOnMap(result.wildfireExternalIds)
+                  }
+                  sx={{ mt: 1.5, textTransform: 'none' }}
+                >
+                  {result.wildfireExternalIds.length === 1
+                    ? 'Show fire on map'
+                    : `Show ${result.wildfireExternalIds.length} fires on map`}
+                </Button>
+              ) : result.mapContext && (
                 <Button
                   type="button"
                   size="small"

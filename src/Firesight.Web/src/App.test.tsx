@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
+import { askFiresight } from './services/askFiresightService'
 import { getWildfires, type Wildfire } from './services/wildfireService'
 import { buildWildfire, hoursAgoUtc } from './test/fixtures'
 import type { MapFocusArea } from './utils/mapView'
@@ -48,6 +49,7 @@ vi.mock('./services/locationService', () => ({
 }))
 
 const mockedGetWildfires = vi.mocked(getWildfires)
+const mockedAskFiresight = vi.mocked(askFiresight)
 
 // Updated 1, 2 and 3 hours ago, so the Recent tab lists them in this order.
 // Each sits somewhere different so the focus assertions can tell them apart.
@@ -115,5 +117,32 @@ describe('App', () => {
     expect(
       screen.queryByRole('status', { name: 'Map view' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('shows the fires an Ask AI answer names on the map', async () => {
+    mockedAskFiresight.mockResolvedValue({
+      answer: 'The largest are 2026_NT_C and 2026_NT_A.',
+      toolsUsed: ['get_active_wildfires'],
+      mapContext: null,
+      wildfireExternalIds: ['2026_NT_C', '2026_NT_A'],
+    })
+    const user = userEvent.setup()
+    render(<App />)
+
+    const mapFireIds = await screen.findByTestId('map-fire-ids')
+    await user.type(
+      screen.getByRole('textbox', { name: 'Ask Firesight question' }),
+      'largest fires',
+    )
+    await user.click(screen.getByRole('button', { name: 'Ask Firesight' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'Show 2 fires on map' }),
+    )
+
+    // Only the named fires, with details from the loaded fire data.
+    expect(mapFireIds).toHaveTextContent(/^fire-a,fire-c$/)
+    expect(screen.getByTestId('map-selected-id')).toBeEmptyDOMElement()
+    const banner = screen.getByRole('status', { name: 'Map view' })
+    expect(within(banner).getByText('AI map view')).toBeInTheDocument()
   })
 })

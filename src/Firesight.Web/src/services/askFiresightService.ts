@@ -9,6 +9,8 @@ export interface AskFiresightResult {
   answer: string
   toolsUsed: string[]
   mapContext: AskFiresightMapContext | null
+  // CWFIS IDs (Wildfire.externalId) of the fires the answer mentions.
+  wildfireExternalIds: string[]
 }
 
 export async function askFiresight(

@@ -48,6 +48,13 @@ function describeMapView(mapView: MapView): {
           `${formatRadius(mapView.focusArea.radiusKm)} of ` +
           `${mapView.label ?? 'the selected location'}.`,
       }
+    case 'wildfires':
+      return {
+        title: 'AI map view',
+        description:
+          `Showing the ${mapView.wildfires.length.toLocaleString()} fires ` +
+          'named in the Ask Firesight answer.',
+      }
     case 'wildfire': {
       const { wildfire } = mapView
       return {

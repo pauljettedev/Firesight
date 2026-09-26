@@ -53,6 +53,8 @@ export function useMapState() {
   return {
     ...state,
     showAskResultOnMap,
+    showWildfires: (wildfires: Wildfire[]) =>
+      changeView({ type: 'showWildfires', wildfires }),
     focusWildfire: (wildfire: Wildfire) =>
       changeView({ type: 'focusWildfire', wildfire }),
     selectWildfire: (wildfire: Wildfire) =>

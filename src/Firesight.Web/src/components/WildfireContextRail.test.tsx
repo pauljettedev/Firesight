@@ -35,6 +35,7 @@ describe('WildfireContextRail', () => {
         onRecentWildfireSelect={onRecentWildfireSelect}
         onNearbyWildfireSelect={vi.fn()}
         onShowAskResultOnMap={vi.fn()}
+        onShowAskWildfiresOnMap={vi.fn()}
       />,
     )
 

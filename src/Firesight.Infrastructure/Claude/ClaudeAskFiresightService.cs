@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Anthropic.Models.Messages;
 using Firesight.Application.AskFiresight;
 using Firesight.Application.Common;
@@ -44,6 +45,9 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         the user specifically asks for those details.
         Do not add headings, summaries, generic disclaimers, follow-up questions, or offers to provide more information.
         Use human-facing wildfire terminology rather than internal property names or raw field labels.
+        Write plain text only. Do not use Markdown such as **bold**, headings, or tables.
+        When a list or detail answer names specific wildfires, include each one's identifier exactly as it appears
+        in tool output, so Firesight can show those fires on the map.
         Interpret stage-of-control codes correctly: OC is Out of Control, BH is Being Held, UC is Under Control,
         and EX is Extinguished.
         Only discuss dataset synchronization freshness when the user asks about data freshness or synchronization.
@@ -63,6 +67,10 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
 
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
+
+    // A run of letters, digits, underscores and dashes: the characters a CWFIS
+    // ID is made of, e.g. 2026_BC_2026-C40983.
+    private static readonly Regex IdShapedWord = new(@"[\w-]+");
 
     // Do not turn on Tool.Strict for any of the five tools below.
     // Claude requires "additionalProperties": false on a strict tool's schema,
@@ -243,6 +251,10 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         GeocodedLocationDto? lastGeocodedLocation = null;
         AskFiresightMapContext? mapContext = null;
 
+        // IDs of every fire any tool returned while answering this question. The
+        // final answer can only point the map at fires from this set.
+        var returnedWildfireIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         // Each loop iteration = one round trip to Claude. We keep going until it
         // answers with plain text instead of a tool call, or we hit MaxToolRounds.
         for (var round = 0; round < MaxToolRounds; round++)
@@ -340,6 +352,9 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     lastGeocodedLocation = execution.GeocodedLocation;
                 }
 
+                returnedWildfireIds.UnionWith(
+                    execution.ReturnedWildfires().Select(wildfire => wildfire.ExternalId));
+
                 // Always overwrite this, even with null. If the tool Claude just called
                 // isn't a location search, the conversation has moved on to something
                 // else. Any map location from an earlier round should stop applying now.
@@ -383,7 +398,8 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                 return new AskFiresightResult(
                     answer,
                     toolsUsed,
-                    mapContext);
+                    mapContext,
+                    WildfireIdsMentionedIn(answer, returnedWildfireIds));
             }
 
             // Grow the conversation for the next round: what Claude said, then
@@ -548,7 +564,8 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                         execution.ResponseMode == "exists",
                         mapContext),
                     toolsUsed,
-                    mapContext);
+                    mapContext,
+                    []);
             }
 
             if (execution.Wildfires is not null)
@@ -567,7 +584,8 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                         execution.RequestedStatus,
                         execution.ResponseMode == "exists"),
                     toolsUsed,
-                    null);
+                    null,
+                    []);
             }
         }
 
@@ -578,10 +596,34 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
             return new AskFiresightResult(
                 $"{execution.Wildfire.ExternalId} is {StageOfControlLabel(execution.Wildfire.Status)}.",
                 toolsUsed,
-                null);
+                null,
+                [execution.Wildfire.ExternalId]);
         }
 
         return null;
+    }
+
+    // The returned fire IDs that the answer mentions, in the order it mentions
+    // them. The answer is split into whole ID-shaped words first, so
+    // 2026_BC_K1 doesn't count as mentioned when the answer says 2026_BC_K12.
+    private static List<string> WildfireIdsMentionedIn(
+        string answer,
+        HashSet<string> returnedIds)
+    {
+        var mentionedIds = new List<string>();
+
+        foreach (Match word in IdShapedWord.Matches(answer))
+        {
+            // TryGetValue hands back the ID as the tool returned it, even if
+            // the answer wrote it in different case.
+            if (returnedIds.TryGetValue(word.Value, out var id) &&
+                !mentionedIds.Contains(id))
+            {
+                mentionedIds.Add(id);
+            }
+        }
+
+        return mentionedIds;
     }
 
     private static JsonElement Schema(string json) =>
@@ -696,5 +738,11 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         string? ResponseMode = null,
         IReadOnlyList<WildfireDto>? Wildfires = null,
         IReadOnlyList<NearbyWildfireDto>? NearbyWildfires = null,
-        WildfireDto? Wildfire = null);
+        WildfireDto? Wildfire = null)
+    {
+        public IEnumerable<WildfireDto> ReturnedWildfires() =>
+            (Wildfires ?? [])
+                .Concat(NearbyWildfires?.Select(nearby => nearby.Wildfire) ?? [])
+                .Concat(Wildfire is null ? [] : [Wildfire]);
+    }
 }

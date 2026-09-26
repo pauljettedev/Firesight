@@ -7,11 +7,11 @@ export interface MapFocusArea {
   radiusKm: number
 }
 
-// The map normally shows every fire. A MapView narrows it: either to the
-// fires around a place (from an Ask AI answer) or to one fire (from the
-// Recent tab). null means "show everything".
+// The map normally shows every fire. A MapView narrows it: to the fires
+// around a place or the fires an answer names (both from Ask AI), or to one
+// fire (from the Recent tab). null means "show everything".
 //
-// Both kinds carry a focusArea, so the map has one way to move its camera
+// Every kind carries a focusArea, so the map has one way to move its camera
 // to "whatever is being shown" instead of a separate path per kind.
 export type MapView =
   | {
@@ -19,6 +19,11 @@ export type MapView =
       focusArea: MapFocusArea
       wildfires: Wildfire[]
       label: string | null
+    }
+  | {
+      kind: 'wildfires'
+      focusArea: MapFocusArea
+      wildfires: Wildfire[]
     }
   | {
       kind: 'wildfire'
@@ -45,6 +50,49 @@ export function createSingleWildfireView(wildfire: Wildfire): MapView {
   }
 }
 
+// Frames a group of fires. The map's camera turns a focusArea back into a
+// box using the same 111 km per degree maths, so a radius covering the
+// fires' bounding box keeps them all in view.
+export function createWildfiresView(wildfires: Wildfire[]): MapView {
+  const latitudes = wildfires.map((wildfire) => wildfire.latitude)
+  const longitudes = wildfires.map((wildfire) => wildfire.longitude)
+  const latitude = (Math.min(...latitudes) + Math.max(...latitudes)) / 2
+  const longitude = (Math.min(...longitudes) + Math.max(...longitudes)) / 2
+
+  const latitudeSpanKm =
+    ((Math.max(...latitudes) - Math.min(...latitudes)) / 2) * 111
+  const longitudeSpanKm =
+    ((Math.max(...longitudes) - Math.min(...longitudes)) / 2) *
+    111 *
+    Math.max(Math.cos((latitude * Math.PI) / 180), 0.15)
+
+  return {
+    kind: 'wildfires',
+    wildfires,
+    focusArea: {
+      latitude,
+      longitude,
+      radiusKm: Math.max(
+        latitudeSpanKm,
+        longitudeSpanKm,
+        singleWildfireFocusRadiusKm,
+      ),
+    },
+  }
+}
+
+// The loaded fires with these CWFIS IDs. Fire details on the map always come
+// from the Firesight API, never from the AI's answer text.
+export function wildfiresWithExternalIds(
+  allWildfires: Wildfire[],
+  externalIds: string[],
+): Wildfire[] {
+  const ids = new Set(externalIds.map((id) => id.toLowerCase()))
+  return allWildfires.filter((wildfire) =>
+    ids.has(wildfire.externalId.toLowerCase()),
+  )
+}
+
 export function wildfiresInView(
   mapView: MapView | null,
   allWildfires: Wildfire[],
@@ -55,6 +103,7 @@ export function wildfiresInView(
 
   switch (mapView.kind) {
     case 'area':
+    case 'wildfires':
       return mapView.wildfires
     case 'wildfire':
       return [mapView.wildfire]
