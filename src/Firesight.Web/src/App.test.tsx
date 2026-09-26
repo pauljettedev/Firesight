@@ -136,13 +136,20 @@ describe('App', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Ask Firesight' }))
     await user.click(
-      await screen.findByRole('button', { name: 'Show 2 fires on map' }),
+      await screen.findByRole('button', { name: 'Show all 2 fires on map' }),
     )
 
-    // Only the named fires, with details from the loaded fire data.
-    expect(mapFireIds).toHaveTextContent(/^fire-a,fire-c$/)
+    // Only the named fires, in the answer's order, with details from the
+    // loaded fire data.
+    expect(mapFireIds).toHaveTextContent(/^fire-c,fire-a$/)
     expect(screen.getByTestId('map-selected-id')).toBeEmptyDOMElement()
     const banner = screen.getByRole('status', { name: 'Map view' })
     expect(within(banner).getByText('AI map view')).toBeInTheDocument()
+
+    // Clicking one of the answer's fires focuses the map on just that fire.
+    await user.click(screen.getByRole('button', { name: /2026_NT_A/ }))
+
+    expect(mapFireIds).toHaveTextContent(/^fire-a$/)
+    expect(screen.getByTestId('map-selected-id')).toHaveTextContent('fire-a')
   })
 })

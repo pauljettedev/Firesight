@@ -26,12 +26,15 @@ describe('createWildfiresView', () => {
 })
 
 describe('wildfiresWithExternalIds', () => {
-  it('finds loaded fires by CWFIS ID, ignoring case and unknown IDs', () => {
+  it('finds loaded fires by CWFIS ID in the order given, skipping unknown IDs', () => {
     const fireA = buildWildfire({ id: 'a', externalId: '2026_BC_A' })
     const fireB = buildWildfire({ id: 'b', externalId: '2026_BC_B' })
 
     expect(
-      wildfiresWithExternalIds([fireA, fireB], ['2026_bc_b', '2026_XX_GONE']),
-    ).toEqual([fireB])
+      wildfiresWithExternalIds(
+        [fireA, fireB],
+        ['2026_BC_B', '2026_XX_GONE', '2026_BC_A'],
+      ),
+    ).toEqual([fireB, fireA])
   })
 })

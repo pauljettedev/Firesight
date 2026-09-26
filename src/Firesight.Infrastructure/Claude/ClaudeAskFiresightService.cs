@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Anthropic.Models.Messages;
 using Firesight.Application.AskFiresight;
 using Firesight.Application.Common;
@@ -46,8 +45,11 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         Do not add headings, summaries, generic disclaimers, follow-up questions, or offers to provide more information.
         Use human-facing wildfire terminology rather than internal property names or raw field labels.
         Write plain text only. Do not use Markdown such as **bold**, headings, or tables.
-        When a list or detail answer names specific wildfires, include each one's identifier exactly as it appears
-        in tool output, so Firesight can show those fires on the map.
+        Always give your final reply by calling the answer tool, once, as your last step.
+        In its wildfireIds, list the identifiers of the wildfires your reply is about, copied exactly from tool output,
+        in the order they should be shown. Use an empty list when the reply isn't about specific wildfires.
+        Firesight shows each listed wildfire's status, size, and location under your reply, so don't repeat those
+        details in the text. For example, reply "The three largest fires are:" and list their identifiers.
         Interpret stage-of-control codes correctly: OC is Out of Control, BH is Being Held, UC is Under Control,
         and EX is Extinguished.
         Only discuss dataset synchronization freshness when the user asks about data freshness or synchronization.
@@ -68,11 +70,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
-    // A run of letters, digits, underscores and dashes: the characters a CWFIS
-    // ID is made of, e.g. 2026_BC_2026-C40983.
-    private static readonly Regex IdShapedWord = new(@"[\w-]+");
-
-    // Do not turn on Tool.Strict for any of the five tools below.
+    // Do not turn on Tool.Strict for any of the tools below.
     // Claude requires "additionalProperties": false on a strict tool's schema,
     // and the C# library we use here has no way to set that.
     // Turning Strict on would make every call fail with a 400 error, every
@@ -215,6 +213,38 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         }
     };
 
+    // Not a data tool: Claude calls this to give its final reply, so the fires
+    // the reply is about come back as a list rather than buried in the text.
+    private const string AnswerToolName = "answer";
+
+    private static readonly Tool AnswerTool = new()
+    {
+        Name = AnswerToolName,
+        Description = "Give your final reply to the user. Call this once, as your last step.",
+        InputSchema = new()
+        {
+            Properties = new Dictionary<string, JsonElement>
+            {
+                ["text"] = Schema(
+                    """
+                    {
+                      "type": "string",
+                      "description": "The reply shown to the user, in plain text."
+                    }
+                    """),
+                ["wildfireIds"] = Schema(
+                    """
+                    {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "Identifiers of the wildfires the reply is about, copied exactly from tool output, in display order. Empty if none."
+                    }
+                    """)
+            },
+            Required = ["text", "wildfireIds"]
+        }
+    };
+
     private readonly IClaudeMessagesClient client;
     private readonly string model;
     private readonly IWildfireService wildfireService;
@@ -273,7 +303,8 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     GetActiveWildfiresTool,
                     GetWildfireByExternalIdTool,
                     FindWildfiresNearLocationTool,
-                    GetFeedSyncStateTool
+                    GetFeedSyncStateTool,
+                    AnswerTool
                 ],
                 Messages = messages
             };
@@ -325,6 +356,17 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                 if (!block.TryPickToolUse(out ToolUseBlock? toolUse))
                 {
                     continue;
+                }
+
+                // Claude's final reply. Its fire IDs are only claims, so keep
+                // the ones that match fires our tools actually returned.
+                if (toolUse.Name == AnswerToolName)
+                {
+                    return FinalAnswer(
+                        GetOptionalString(toolUse.Input, "text"),
+                        toolsUsed,
+                        mapContext,
+                        VerifiedWildfireIds(toolUse.Input, returnedWildfireIds));
                 }
 
                 // Claude wants to call one of our tools. Echo the request back
@@ -384,22 +426,16 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                 });
             }
 
-            // No tool calls at all this round means Claude gave a final answer.
+            // No tool calls at all this round means Claude answered in plain
+            // text instead of using the answer tool. The text still counts,
+            // it just can't list any fires.
             if (toolUseCount == 0)
             {
-                var answer = string.Join("\n", answerParts);
-
-                if (string.IsNullOrWhiteSpace(answer))
-                {
-                    throw new InvalidOperationException(
-                        "Ask Firesight returned no answer.");
-                }
-
-                return new AskFiresightResult(
-                    answer,
+                return FinalAnswer(
+                    string.Join("\n", answerParts),
                     toolsUsed,
                     mapContext,
-                    WildfireIdsMentionedIn(answer, returnedWildfireIds));
+                    []);
             }
 
             // Grow the conversation for the next round: what Claude said, then
@@ -557,7 +593,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                     execution.NearbyWildfires.Select(item => item.Wildfire),
                     execution.RequestedStatus);
 
-                return new AskFiresightResult(
+                return FinalAnswer(
                     FormatCountAnswer(
                         count,
                         execution.RequestedStatus,
@@ -578,7 +614,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
                 // We pass null here instead of reusing an earlier round's mapContext,
                 // which could be left over from an unrelated location search earlier
                 // in this same conversation.
-                return new AskFiresightResult(
+                return FinalAnswer(
                     FormatCountAnswer(
                         count,
                         execution.RequestedStatus,
@@ -593,7 +629,7 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
             execution.Wildfire is not null)
         {
             // Same reasoning: a by-ID status lookup isn't location-scoped either.
-            return new AskFiresightResult(
+            return FinalAnswer(
                 $"{execution.Wildfire.ExternalId} is {StageOfControlLabel(execution.Wildfire.Status)}.",
                 toolsUsed,
                 null,
@@ -603,27 +639,58 @@ public sealed class ClaudeAskFiresightService : IAskFiresightService
         return null;
     }
 
-    // The returned fire IDs that the answer mentions, in the order it mentions
-    // them. The answer is split into whole ID-shaped words first, so
-    // 2026_BC_K1 doesn't count as mentioned when the answer says 2026_BC_K12.
-    private static List<string> WildfireIdsMentionedIn(
-        string answer,
+    // Every answer ends here: Claude's answer tool, a plain-text reply, and the
+    // count and status answers our own code works out. One rule for what
+    // counts as an answer, and one place a result is built.
+    private static AskFiresightResult FinalAnswer(
+        string? text,
+        IReadOnlyList<string> toolsUsed,
+        AskFiresightMapContext? mapContext,
+        IReadOnlyList<string> wildfireIds)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new InvalidOperationException("Ask Firesight returned no answer.");
+        }
+
+        return new AskFiresightResult(text, toolsUsed, mapContext, wildfireIds);
+    }
+
+    // The fire IDs Claude listed in its answer, checked against the fires our
+    // tools returned for this question. Claude's copy of an ID can differ from
+    // the real one, so each is looked up (ignoring case and stray spaces) and
+    // the real ID is used. IDs that match nothing are dropped and logged.
+    private List<string> VerifiedWildfireIds(
+        IReadOnlyDictionary<string, JsonElement> answerInput,
         HashSet<string> returnedIds)
     {
-        var mentionedIds = new List<string>();
+        var verifiedIds = new List<string>();
 
-        foreach (Match word in IdShapedWord.Matches(answer))
+        if (!answerInput.TryGetValue("wildfireIds", out var claimedIds) ||
+            claimedIds.ValueKind != JsonValueKind.Array)
         {
-            // TryGetValue hands back the ID as the tool returned it, even if
-            // the answer wrote it in different case.
-            if (returnedIds.TryGetValue(word.Value, out var id) &&
-                !mentionedIds.Contains(id))
+            return verifiedIds;
+        }
+
+        foreach (var claimedId in claimedIds.EnumerateArray())
+        {
+            var id = claimedId.GetString()?.Trim() ?? string.Empty;
+
+            if (!returnedIds.TryGetValue(id, out var realId))
             {
-                mentionedIds.Add(id);
+                logger.LogWarning(
+                    "Ask Firesight dropped wildfire ID '{WildfireId}': no tool returned it.",
+                    id);
+                continue;
+            }
+
+            if (!verifiedIds.Contains(realId))
+            {
+                verifiedIds.Add(realId);
             }
         }
 
-        return mentionedIds;
+        return verifiedIds;
     }
 
     private static JsonElement Schema(string json) =>

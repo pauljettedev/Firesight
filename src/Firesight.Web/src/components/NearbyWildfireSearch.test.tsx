@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NearbyWildfireSearch } from './NearbyWildfireSearch'
 import { geocodeLocation } from '../services/locationService'
@@ -102,6 +102,29 @@ describe('NearbyWildfireSearch', () => {
     const areaText = screen.getByText(/ha$/)
     expect(areaText.textContent?.replace(/\D/g, '')).toBe('1250')
     expect(screen.getByText('cwfis:test-1')).toBeInTheDocument()
+  })
+
+  it('shows each fire with its own distance', async () => {
+    mockedGeocodeLocation.mockResolvedValue({
+      displayName: 'Ottawa, Ontario, Canada',
+      latitude: 45.4215,
+      longitude: -75.6972,
+    })
+    mockedGetNearbyWildfires.mockResolvedValue([
+      { wildfire: buildWildfire({ id: 'near', externalId: 'NEAR' }), distanceKm: 4.2 },
+      { wildfire: buildWildfire({ id: 'far', externalId: 'FAR' }), distanceKm: 7.5 },
+    ])
+
+    const user = userEvent.setup()
+    render(<NearbyWildfireSearch onSelect={onSelect} />)
+
+    await user.type(screen.getByLabelText('Town or city'), 'Ottawa')
+    await user.click(screen.getByRole('button', { name: 'Search nearby fires' }))
+
+    const nearRow = await screen.findByRole('button', { name: /NEAR/ })
+    const farRow = screen.getByRole('button', { name: /FAR/ })
+    expect(within(nearRow).getByText('4.2 km')).toBeInTheDocument()
+    expect(within(farRow).getByText('7.5 km')).toBeInTheDocument()
   })
 
   it('shows a specific message when no wildfires are found nearby', async () => {

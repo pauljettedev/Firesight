@@ -73,8 +73,8 @@ nothing matches. Uses OpenStreetMap's Nominatim service.
 - `answer`: the answer text
 - `toolsUsed`: which Firesight tools were called to answer it
 - `mapContext`: a point and radius to show on the map, or `null`
-- `wildfireExternalIds`: CWFIS IDs of the fires the answer names, in the order it names them.
-  Only fires that Firesight's own tools returned are included.
+- `wildfireExternalIds`: CWFIS IDs of the fires the answer is about, in display order. Claude
+  lists them, and Firesight keeps only IDs its own tools returned for that question.
 
 How it works: [ADR 007](decisions/007-ask-firesight.md).
 

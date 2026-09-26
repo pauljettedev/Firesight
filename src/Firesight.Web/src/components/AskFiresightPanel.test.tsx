@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AskFiresightPanel } from './AskFiresightPanel'
 import {
   askFiresight,
   type AskFiresightResult,
 } from '../services/askFiresightService'
+import { buildWildfire } from '../test/fixtures'
 
 vi.mock('../services/askFiresightService', () => ({
   askFiresight: vi.fn(),
@@ -20,6 +21,9 @@ const kamloops = {
   label: 'Kamloops, BC',
 }
 
+const fireK1 = buildWildfire({ id: 'k1', externalId: '2026_BC_K1' })
+const fireK12 = buildWildfire({ id: 'k12', externalId: '2026_BC_K12' })
+
 function answer(overrides: Partial<AskFiresightResult>): AskFiresightResult {
   return {
     answer: 'An answer.',
@@ -33,6 +37,7 @@ function answer(overrides: Partial<AskFiresightResult>): AskFiresightResult {
 describe('AskFiresightPanel', () => {
   const onShowOnMap = vi.fn()
   const onShowWildfiresOnMap = vi.fn()
+  const onWildfireSelect = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -42,8 +47,11 @@ describe('AskFiresightPanel', () => {
     const user = userEvent.setup()
     render(
       <AskFiresightPanel
-        onShowOnMap={onShowOnMap}
+        wildfires={[fireK1, fireK12]}
+        selectedWildfireId={null}
+        onShowAreaOnMap={onShowOnMap}
         onShowWildfiresOnMap={onShowWildfiresOnMap}
+        onWildfireSelect={onWildfireSelect}
       />,
     )
     await user.type(
@@ -54,17 +62,34 @@ describe('AskFiresightPanel', () => {
     return user
   }
 
+  it('lists the fires an answer names, in its order, and focuses one when clicked', async () => {
+    mockedAskFiresight.mockResolvedValue(
+      answer({ wildfireExternalIds: ['2026_BC_K12', '2026_BC_K1'] }),
+    )
+    const user = await ask()
+
+    const rows = await screen.findAllByRole('button', { name: /2026_BC_K/ })
+    expect(rows.map((row) => within(row).getByText(/2026_BC_K/).textContent))
+      .toEqual(['2026_BC_K12', '2026_BC_K1'])
+
+    await user.click(rows[0])
+    expect(onWildfireSelect).toHaveBeenCalledWith(fireK12)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Show all 2 fires on map' }),
+    )
+    expect(onShowWildfiresOnMap).toHaveBeenCalledWith([fireK12, fireK1])
+  })
+
   it('offers the fire an answer names, even when it also searched an area', async () => {
     mockedAskFiresight.mockResolvedValue(
       answer({ mapContext: kamloops, wildfireExternalIds: ['2026_BC_K12'] }),
     )
-    const user = await ask()
+    await ask()
 
-    await user.click(
+    expect(
       await screen.findByRole('button', { name: 'Show fire on map' }),
-    )
-
-    expect(onShowWildfiresOnMap).toHaveBeenCalledWith(['2026_BC_K12'])
+    ).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: /area on map/ }),
     ).not.toBeInTheDocument()

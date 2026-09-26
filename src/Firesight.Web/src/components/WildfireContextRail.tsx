@@ -9,20 +9,23 @@ import { RecentWildfireList } from './RecentWildfireList'
 type RailMode = 'recent' | 'nearby' | 'ask'
 
 interface WildfireContextRailProps {
+  wildfires: Wildfire[]
   recentWildfires: Wildfire[]
   selectedWildfireId: string | null
-  onRecentWildfireSelect: (wildfire: Wildfire) => void
+  // Recent and Ask AI both narrow the map to the fire that was clicked.
+  onFocusWildfire: (wildfire: Wildfire) => void
   onNearbyWildfireSelect: (wildfire: Wildfire) => void
-  onShowAskResultOnMap: (context: AskFiresightMapContext) => Promise<void>
-  onShowAskWildfiresOnMap: (externalIds: string[]) => void
+  onShowAskAreaOnMap: (context: AskFiresightMapContext) => Promise<void>
+  onShowAskWildfiresOnMap: (wildfires: Wildfire[]) => void
 }
 
 export function WildfireContextRail({
+  wildfires,
   recentWildfires,
   selectedWildfireId,
-  onRecentWildfireSelect,
+  onFocusWildfire,
   onNearbyWildfireSelect,
-  onShowAskResultOnMap,
+  onShowAskAreaOnMap,
   onShowAskWildfiresOnMap,
 }: WildfireContextRailProps) {
   const [mode, setMode] = useState<RailMode>('ask')
@@ -62,7 +65,7 @@ export function WildfireContextRail({
           <RecentWildfireList
             wildfires={recentWildfires}
             selectedWildfireId={selectedWildfireId}
-            onSelect={onRecentWildfireSelect}
+            onSelect={onFocusWildfire}
           />
         </Box>
 
@@ -75,8 +78,11 @@ export function WildfireContextRail({
 
         <Box sx={{ display: mode === 'ask' ? 'block' : 'none' }}>
           <AskFiresightPanel
-            onShowOnMap={onShowAskResultOnMap}
+            wildfires={wildfires}
+            selectedWildfireId={selectedWildfireId}
+            onShowAreaOnMap={onShowAskAreaOnMap}
             onShowWildfiresOnMap={onShowAskWildfiresOnMap}
+            onWildfireSelect={onFocusWildfire}
           />
         </Box>
       </Box>

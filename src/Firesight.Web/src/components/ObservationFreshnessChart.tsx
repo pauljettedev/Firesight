@@ -1,5 +1,6 @@
 import { Box, Paper, Stack, Typography } from '@mui/material'
 import type { Wildfire } from '../services/wildfireService'
+import { SectionHeading } from './SectionHeading'
 
 interface ObservationFreshnessChartProps {
   wildfires: Wildfire[]
@@ -28,18 +29,10 @@ export function ObservationFreshnessChart({
           gap: 0.75,
         }}
       >
-        <Box>
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ letterSpacing: '0.1em' }}
-          >
-            Observation freshness
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            How recently each wildfire was observed in the CWFIS feed
-          </Typography>
-        </Box>
+        <SectionHeading
+          title="Observation freshness"
+          subtitle="How recently each wildfire was observed in the CWFIS feed"
+        />
 
         <Typography
           variant="caption"

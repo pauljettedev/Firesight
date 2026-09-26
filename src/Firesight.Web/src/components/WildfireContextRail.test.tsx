@@ -19,9 +19,9 @@ vi.mock('../services/wildfireService', () => ({
 }))
 
 describe('WildfireContextRail', () => {
-  it('passes the clicked recent fire to onRecentWildfireSelect', async () => {
+  it('passes the clicked recent fire to onFocusWildfire', async () => {
     const user = userEvent.setup()
-    const onRecentWildfireSelect = vi.fn()
+    const onFocusWildfire = vi.fn()
     const first = buildWildfire({ externalId: '2026_NT_FS016-26' })
     const second = buildWildfire({
       id: 'wildfire-2',
@@ -30,11 +30,12 @@ describe('WildfireContextRail', () => {
 
     render(
       <WildfireContextRail
+        wildfires={[first, second]}
         recentWildfires={[first, second]}
         selectedWildfireId={null}
-        onRecentWildfireSelect={onRecentWildfireSelect}
+        onFocusWildfire={onFocusWildfire}
         onNearbyWildfireSelect={vi.fn()}
-        onShowAskResultOnMap={vi.fn()}
+        onShowAskAreaOnMap={vi.fn()}
         onShowAskWildfiresOnMap={vi.fn()}
       />,
     )
@@ -42,7 +43,7 @@ describe('WildfireContextRail', () => {
     await user.click(screen.getByRole('button', { name: 'Recent' }))
     await user.click(screen.getByRole('button', { name: /2026_NT_FS014-26/ }))
 
-    expect(onRecentWildfireSelect).toHaveBeenCalledOnce()
-    expect(onRecentWildfireSelect).toHaveBeenCalledWith(second)
+    expect(onFocusWildfire).toHaveBeenCalledOnce()
+    expect(onFocusWildfire).toHaveBeenCalledWith(second)
   })
 })

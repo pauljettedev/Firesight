@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Divider,
   Link,
   Stack,
   TextField,
@@ -16,7 +15,9 @@ import {
   type NearbyWildfire,
   type Wildfire,
 } from '../services/wildfireService'
-import { WildfireListItem } from './WildfireListItem'
+import { errorMessage } from '../utils/errorMessage'
+import { SectionHeading } from './SectionHeading'
+import { MaxListedWildfires, WildfireList } from './WildfireList'
 
 interface NearbyWildfireSearchProps {
   selectedWildfireId?: string | null
@@ -70,29 +71,23 @@ export function NearbyWildfireSearch({
       setResolvedLocation(location.displayName)
       setResults(nearbyWildfires)
     } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Nearby wildfire search failed.',
-      )
+      setError(errorMessage(err, 'Nearby wildfire search failed.'))
     } finally {
       setLoading(false)
     }
   }
 
+  // Lets each list row look up its fire's distance.
+  const distanceKmById = new Map(
+    (results ?? []).map((result) => [result.wildfire.id, result.distanceKm]),
+  )
+
   return (
     <Box>
-      <Typography
-        variant="overline"
-        color="text.secondary"
-        sx={{ letterSpacing: '0.1em' }}
-      >
-        Nearby fires
-      </Typography>
-
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-        Search for wildfires near a Canadian town or city.
-      </Typography>
+      <SectionHeading
+        title="Nearby fires"
+        subtitle="Search for wildfires near a Canadian town or city."
+      />
 
       <Stack spacing={1.25} sx={{ mt: 1.5 }}>
         <TextField
@@ -175,37 +170,29 @@ export function NearbyWildfireSearch({
               No wildfires were found within this radius.
             </Typography>
           ) : (
-            <Stack divider={<Divider flexItem />} sx={{ mt: 0.75 }}>
-              {results.slice(0, 12).map((result) => (
-                <WildfireListItem
-                  key={result.wildfire.id}
-                  wildfire={result.wildfire}
-                  updatedUtc={result.wildfire.lastSeenInFeedUtc}
-                  trailing={
-                    <Typography
-                      variant="caption"
-                      color="primary.main"
-                      sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
-                    >
-                      {formatDistance(result.distanceKm)}
-                    </Typography>
-                  }
-                  selected={result.wildfire.id === selectedWildfireId}
-                  onSelect={onSelect}
-                />
-              ))}
-            </Stack>
+            <WildfireList
+              wildfires={results.map((result) => result.wildfire)}
+              selectedWildfireId={selectedWildfireId}
+              onSelect={onSelect}
+              // Nearby shows when each fire was last seen in the feed, and
+              // how far away it is instead of a status dot.
+              updatedUtc={(wildfire) => wildfire.lastSeenInFeedUtc}
+              trailing={(wildfire) => (
+                <Typography
+                  variant="caption"
+                  color="primary.main"
+                  sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+                >
+                  {/* Always found: the list and this lookup are built from
+                      the same results. */}
+                  {formatDistance(distanceKmById.get(wildfire.id)!)}
+                </Typography>
+              )}
+              limit={MaxListedWildfires}
+              sx={{ mt: 0.75 }}
+            />
           )}
 
-          {results.length > 12 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 1 }}
-            >
-              Showing the 12 nearest results.
-            </Typography>
-          )}
         </Box>
       )}
     </Box>

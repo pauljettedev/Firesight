@@ -489,17 +489,24 @@ public sealed class ClaudeAskFiresightServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_ReturnsIdsOfReturnedFiresTheAnswerMentions_InAnswerOrder()
+    public async Task AskAsync_KeepsOnlyAnswerFireIdsThatToolsReturned()
     {
         var client = CreateClient(
             CreateFunctionCallResponse(
                 "call-1",
                 "get_active_wildfires",
                 """{"status":null,"responseMode":"records"}"""),
-            // Mentions two returned fires (out of ID order) and one ID no tool
-            // returned. The made-up one must not reach the map.
-            CreateAnswerResponse(
-                "Largest: 2026_ON_TEST_002, then 2026_ON_TEST_001, then 2026_XX_MADE_UP."));
+            // Claude's IDs are claims: one in the wrong case with stray spaces,
+            // one repeated, and one no tool returned.
+            CreateFunctionCallResponse(
+                "call-2",
+                "answer",
+                """
+                {
+                  "text": "The two largest fires are:",
+                  "wildfireIds": [" 2026_on_test_002 ", "2026_ON_TEST_001", "2026_XX_MADE_UP", "2026_ON_TEST_001"]
+                }
+                """));
 
         var wildfireService = new Mock<IWildfireService>();
         wildfireService
@@ -519,39 +526,13 @@ public sealed class ClaudeAskFiresightServiceTests
 
         var result = await service.AskAsync("What are the two largest fires?");
 
+        Assert.Equal("The two largest fires are:", result.Answer);
+        // The real IDs, in Claude's order, each once. The made-up one is gone.
         Assert.Equal(
             ["2026_ON_TEST_002", "2026_ON_TEST_001"],
             result.WildfireExternalIds);
-    }
-
-    [Fact]
-    public async Task AskAsync_DoesNotMatchAnIdInsideALongerId()
-    {
-        var client = CreateClient(
-            CreateFunctionCallResponse(
-                "call-1",
-                "get_active_wildfires",
-                """{"status":null,"responseMode":"records"}"""),
-            CreateAnswerResponse("The largest is 2026_BC_K12."));
-
-        var wildfireService = new Mock<IWildfireService>();
-        wildfireService
-            .Setup(service => service.GetActiveWildfiresAsync(
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-                [
-                    CreateWildfire("2026_BC_K1"),
-                    CreateWildfire("2026_BC_K12")
-                ]);
-
-        var service = CreateService(
-            client.Object,
-            wildfireService.Object,
-            Mock.Of<ILocationGeocoder>());
-
-        var result = await service.AskAsync("What is the largest fire?");
-
-        Assert.Equal(["2026_BC_K12"], result.WildfireExternalIds);
+        // The answer tool isn't a data source, so it isn't shown as one.
+        Assert.Equal(["get_active_wildfires"], result.ToolsUsed);
     }
 
     [Fact]
@@ -578,6 +559,26 @@ public sealed class ClaudeAskFiresightServiceTests
         var result = await service.AskAsync("What is the status of 2026_ON_TEST_001?");
 
         Assert.Equal(["2026_ON_TEST_001"], result.WildfireExternalIds);
+    }
+
+    [Fact]
+    public async Task AskAsync_ThrowsWhenAnswerToolTextIsEmpty()
+    {
+        var client = CreateClient(
+            CreateFunctionCallResponse(
+                "call-1",
+                "answer",
+                """{"text":"  ","wildfireIds":[]}"""));
+
+        var service = CreateService(
+            client.Object,
+            Mock.Of<IWildfireService>(),
+            Mock.Of<ILocationGeocoder>());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.AskAsync("Anything?"));
+
+        Assert.Equal("Ask Firesight returned no answer.", exception.Message);
     }
 
     [Fact]

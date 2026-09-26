@@ -24,7 +24,7 @@ export function useMapState() {
     dispatch(action)
   }
 
-  async function showAskResultOnMap(context: AskFiresightMapContext) {
+  async function showAskAreaOnMap(context: AskFiresightMapContext) {
     viewRequestRef.current += 1
     const requestId = viewRequestRef.current
 
@@ -52,7 +52,7 @@ export function useMapState() {
 
   return {
     ...state,
-    showAskResultOnMap,
+    showAskAreaOnMap,
     showWildfires: (wildfires: Wildfire[]) =>
       changeView({ type: 'showWildfires', wildfires }),
     focusWildfire: (wildfire: Wildfire) =>

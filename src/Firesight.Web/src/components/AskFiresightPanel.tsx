@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Stack,
   TextField,
@@ -14,7 +13,10 @@ import {
   type AskFiresightMapContext,
   type AskFiresightResult,
 } from '../services/askFiresightService'
-import { formatRadius } from '../utils/wildfirePresentation'
+import type { Wildfire } from '../services/wildfireService'
+import { errorMessage } from '../utils/errorMessage'
+import { AskFiresightAnswer } from './AskFiresightAnswer'
+import { SectionHeading } from './SectionHeading'
 
 const MaxQuestionLength = 500
 
@@ -24,28 +26,21 @@ const exampleQuestions = [
   'Which fires have not been observed recently?',
 ]
 
-const toolLabels: Record<string, string> = {
-  geocode_location: 'Location lookup',
-  get_active_wildfires: 'Current wildfire data',
-  get_wildfire_by_external_id: 'Wildfire record',
-  find_wildfires_near_location: 'Nearby search',
-  get_feed_sync_state: 'Dataset freshness',
-}
-
+// Asks the question. The answer itself is shown by AskFiresightAnswer, which
+// gets these props passed straight through.
 interface AskFiresightPanelProps {
-  onShowOnMap: (context: AskFiresightMapContext) => Promise<void>
-  onShowWildfiresOnMap: (externalIds: string[]) => void
+  wildfires: Wildfire[]
+  selectedWildfireId: string | null
+  onShowAreaOnMap: (context: AskFiresightMapContext) => Promise<void>
+  onShowWildfiresOnMap: (wildfires: Wildfire[]) => void
+  onWildfireSelect: (wildfire: Wildfire) => void
 }
 
-export function AskFiresightPanel({
-  onShowOnMap,
-  onShowWildfiresOnMap,
-}: AskFiresightPanelProps) {
+export function AskFiresightPanel(answerProps: AskFiresightPanelProps) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState<AskFiresightResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [mapLoading, setMapLoading] = useState(false)
 
   const trimmedQuestion = question.trim()
   const canSubmit =
@@ -67,30 +62,9 @@ export function AskFiresightPanel({
     try {
       setResult(await askFiresight(trimmedQuestion))
     } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Ask Firesight failed to answer the question.',
-      )
+      setError(errorMessage(err, 'Ask Firesight failed to answer the question.'))
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleShowOnMap(context: AskFiresightMapContext) {
-    setMapLoading(true)
-    setError(null)
-
-    try {
-      await onShowOnMap(context)
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Firesight failed to update the map.',
-      )
-    } finally {
-      setMapLoading(false)
     }
   }
 
@@ -108,17 +82,10 @@ export function AskFiresightPanel({
 
   return (
     <Box>
-      <Typography
-        variant="overline"
-        color="primary.main"
-        sx={{ letterSpacing: '0.1em', fontWeight: 700 }}
-      >
-        Ask Firesight
-      </Typography>
-
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-        Ask about the current wildfire dataset.
-      </Typography>
+      <SectionHeading
+        title="Ask Firesight"
+        subtitle="Ask about the current wildfire dataset."
+      />
 
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1.5 }}>
         <Stack spacing={1.25}>
@@ -192,90 +159,7 @@ export function AskFiresightPanel({
 
           {error && <Alert severity="error">{error}</Alert>}
 
-          {result && (
-            <Box
-              sx={{
-                borderTop: '1px solid',
-                borderColor: 'divider',
-                pt: 1.5,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  whiteSpace: 'pre-wrap',
-                  lineHeight: 1.6,
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {result.answer}
-              </Typography>
-
-              {/* An answer that names fires shows exactly those. Otherwise an
-                  answer about a place shows the area that was searched. */}
-              {result.wildfireExternalIds.length > 0 ? (
-                <Button
-                  type="button"
-                  size="small"
-                  variant="outlined"
-                  fullWidth
-                  onClick={() =>
-                    onShowWildfiresOnMap(result.wildfireExternalIds)
-                  }
-                  sx={{ mt: 1.5, textTransform: 'none' }}
-                >
-                  {result.wildfireExternalIds.length === 1
-                    ? 'Show fire on map'
-                    : `Show ${result.wildfireExternalIds.length} fires on map`}
-                </Button>
-              ) : result.mapContext && (
-                <Button
-                  type="button"
-                  size="small"
-                  variant="outlined"
-                  fullWidth
-                  disabled={mapLoading}
-                  onClick={() => void handleShowOnMap(result.mapContext!)}
-                  sx={{ mt: 1.5, textTransform: 'none' }}
-                >
-                  {mapLoading ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : (
-                    `Show ${formatRadius(result.mapContext.radiusKm)} area on map`
-                  )}
-                </Button>
-              )}
-
-              {result.toolsUsed.length > 0 && (
-                <Box
-                  sx={{
-                    mt: 1.5,
-                    display: 'flex',
-                    gap: 0.5,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  {result.toolsUsed.map((tool) => (
-                    <Chip
-                      key={tool}
-                      label={toolLabels[tool] ?? tool}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        height: 22,
-                        maxWidth: '100%',
-                        '& .MuiChip-label': {
-                          px: 0.75,
-                          fontSize: '0.68rem',
-                        },
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
-
-            </Box>
-          )}
+          {result && <AskFiresightAnswer result={result} {...answerProps} />}
         </Stack>
       </Box>
     </Box>

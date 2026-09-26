@@ -1,3 +1,5 @@
+import { requestJson } from './http'
+
 export interface AskFiresightMapContext {
   latitude: number
   longitude: number
@@ -13,20 +15,14 @@ export interface AskFiresightResult {
   wildfireExternalIds: string[]
 }
 
-export async function askFiresight(
+export function askFiresight(
   question: string,
 ): Promise<AskFiresightResult> {
-  const response = await fetch('/api/ask/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  return requestJson('/api/ask/', 'Ask Firesight request failed', {
+    init: {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
     },
-    body: JSON.stringify({ question }),
   })
-
-  if (!response.ok) {
-    throw new Error(`Ask Firesight request failed: ${response.status}`)
-  }
-
-  return response.json()
 }

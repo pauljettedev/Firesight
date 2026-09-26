@@ -15,7 +15,8 @@ import { WildfireMap } from './components/WildfireMap'
 import { WildfireStatusSummary } from './components/WildfireStatusSummary'
 import { getWildfires, type Wildfire } from './services/wildfireService'
 import { useMapState } from './state/useMapState'
-import { wildfiresInView, wildfiresWithExternalIds } from './utils/mapView'
+import { wildfiresInView } from './utils/mapView'
+import { errorMessage } from './utils/errorMessage'
 import { wildfireUpdatedUtc } from './utils/wildfirePresentation'
 
 function App() {
@@ -31,7 +32,7 @@ function App() {
     getWildfires()
       .then(setWildfires)
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Firesight failed to load')
+        setError(errorMessage(err, 'Firesight failed to load'))
       })
       .finally(() => setLoading(false))
   }, [])
@@ -96,16 +97,13 @@ function App() {
               }}
             >
               <WildfireContextRail
+                wildfires={wildfires}
                 recentWildfires={recentWildfires}
                 selectedWildfireId={selectedWildfire?.id ?? null}
-                onRecentWildfireSelect={mapState.focusWildfire}
+                onFocusWildfire={mapState.focusWildfire}
                 onNearbyWildfireSelect={mapState.selectWildfire}
-                onShowAskResultOnMap={mapState.showAskResultOnMap}
-                onShowAskWildfiresOnMap={(externalIds) =>
-                  mapState.showWildfires(
-                    wildfiresWithExternalIds(wildfires, externalIds),
-                  )
-                }
+                onShowAskAreaOnMap={mapState.showAskAreaOnMap}
+                onShowAskWildfiresOnMap={mapState.showWildfires}
               />
 
               <Stack spacing={2} sx={{ minWidth: 0 }}>

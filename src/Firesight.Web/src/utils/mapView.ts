@@ -81,16 +81,28 @@ export function createWildfiresView(wildfires: Wildfire[]): MapView {
   }
 }
 
-// The loaded fires with these CWFIS IDs. Fire details on the map always come
-// from the Firesight API, never from the AI's answer text.
+// The loaded fires with these CWFIS IDs, in the same order as the IDs. IDs
+// with no loaded fire are skipped. Fire details always come from the
+// Firesight API, never from the AI's answer text. (The API has already
+// replaced Claude's copy of each ID with the real one, so an exact match is
+// enough.)
 export function wildfiresWithExternalIds(
   allWildfires: Wildfire[],
   externalIds: string[],
 ): Wildfire[] {
-  const ids = new Set(externalIds.map((id) => id.toLowerCase()))
-  return allWildfires.filter((wildfire) =>
-    ids.has(wildfire.externalId.toLowerCase()),
-  )
+  const found: Wildfire[] = []
+
+  for (const id of externalIds) {
+    const wildfire = allWildfires.find(
+      (candidate) => candidate.externalId === id,
+    )
+
+    if (wildfire) {
+      found.push(wildfire)
+    }
+  }
+
+  return found
 }
 
 export function wildfiresInView(
