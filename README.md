@@ -46,8 +46,8 @@ but its official status is never changed. Firesight only reports what CWFIS said
 query (`ST_DWithin`), measured in real distances on the globe and sorted by distance.
 
 **Tested against the real thing.** Integration tests start a disposable PostGIS container,
-apply the real migrations, and run the actual spatial queries and MCP transport, not
-in-memory fakes. The UI has its own component tests.
+apply the real migrations, and run the actual spatial queries, not an in-memory fake. The MCP
+tools are tested through a real MCP client connection. The UI has its own component tests.
 
 **Shipped, not just built.** Every push to `main` runs the tests, then deploys to a
 DigitalOcean droplet over SSH. The deploy action is pinned to a commit and the server's

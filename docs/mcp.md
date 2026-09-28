@@ -1,37 +1,58 @@
 # MCP
 
-Firesight has an MCP (Model Context Protocol) server, so AI assistants can query its wildfire
-data directly. It runs inside the API at `/mcp` over HTTP, with no login and no session
-state.
+Firesight has an MCP (Model Context Protocol) server, so AI assistants such as Claude can look
+up its wildfire data themselves. It's part of the API, served at `/mcp` over HTTP.
 
-Local URL: `http://localhost:5213/mcp`
+| | |
+| --- | --- |
+| Live | `https://firesight.codewheel.ca/mcp` |
+| Local | `http://localhost:5213/mcp` |
+
+There's no login and no rate limit, the same as the REST wildfire endpoints. Each request
+stands on its own; the server keeps no session between calls.
+
+To add it to Claude Code:
+
+```bash
+claude mcp add --transport http firesight https://firesight.codewheel.ca/mcp
+```
 
 ## Tools
 
+All three tools only read data. They never change anything.
+
 | Tool | Inputs | Returns |
 | --- | --- | --- |
-| `get_active_wildfires` | none | All current fires |
-| `get_wildfire_by_external_id` | `externalId` (CWFIS `national_fire_id`) | One fire, or `null` |
-| `find_wildfires_near_location` | `latitude`, `longitude`, `radiusKm` | Fires nearest first, with `distanceKm` |
+| `get_active_wildfires` | none | Every fire the map shows |
+| `get_wildfire_by_external_id` | `externalId`, the CWFIS `national_fire_id`, for example `2026_ON_THU_FIRE_036` | That fire, or `null` if Firesight doesn't have it |
+| `find_wildfires_near_location` | `latitude`, `longitude`, `radiusKm` | Fires within the radius, nearest first, each with its `distanceKm` |
 
-Fire fields match the REST API. See [api.md](api.md).
+The tools return the same fires the map shows: current fires, including stale ones, and
+extinguished fires for 7 days after they went out. Each fire has the same fields as the REST
+API ([api.md](api.md)), including `isStale`.
 
-Ask Firesight doesn't use this MCP server. It has its own tool list, which adds place-name
-lookup and sync state. See [ADR 007](decisions/007-ask-firesight.md).
+`find_wildfires_near_location` checks its inputs the same way the REST API does: latitude from
+-90 to 90, longitude from -180 to 180, and a radius above 0 and up to 1,000 km. Bad input comes
+back as a tool error listing every problem, for example
+`radiusKm: Radius must be a finite value greater than 0 and at most 1000 km.`
+Any other failure comes back as a generic error, without internal details.
 
-## Rules
+Ask Firesight doesn't use this server. It has its own tools, which add place-name lookup and
+the feed's sync state ([ADR 007](decisions/007-ask-firesight.md)).
 
-- Tools call the same Application services as the REST API. No logic is copied into
-  `Firesight.Mcp`, and tools never query the database ([ADR 005](decisions/005-layered-backend.md)).
-- Bad input (for example, latitude 200) returns a tool error with the validation message.
-  Any other failure returns a generic error with no internal details.
-- Production and the MCP tests register tools through the same `WithFiresightTools()` call,
-  so the tests always check what's actually deployed.
+## How it's built
 
-## Nullable fields in output schemas
+- Each tool calls the same `IWildfireService` as the REST API. There's no wildfire logic and no
+  database access in `Firesight.Mcp` ([ADR 005](decisions/005-layered-backend.md)).
+- Production and the integration tests register the tools through the same
+  `WithFiresightTools()` call, so the tests check the same tools that are deployed.
+- The integration tests connect a real MCP client to the server and call the tools, with a
+  stand-in wildfire service so each test controls what comes back.
 
-.NET describes a field that can be null as `"type": ["string", "null"]`. That's valid JSON
-Schema, but some MCP clients reject it. Firesight rewrites these fields as
-`anyOf: [{ "type": "string" }, { "type": "null" }]`, which means the same thing and works
-everywhere. The rewrite only affects the schemas MCP publishes. The application's data types
-are unchanged.
+## Fields that can be null
+
+Each tool publishes a description of its output (an output schema), so a client knows what to
+expect. .NET describes a field that can be null, such as `name` or `areaHectares`, as
+`"type": ["string", "null"]`. Some MCP clients reject that, so Firesight publishes those fields
+as `anyOf: [{ "type": "string" }, { "type": "null" }]` instead. Both mean the same thing. This
+only changes the published description; the data itself is the same.
