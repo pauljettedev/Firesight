@@ -1,5 +1,7 @@
 # Firesight
 
+[![CI](https://github.com/pauljettedev/Firesight/actions/workflows/ci.yml/badge.svg)](https://github.com/pauljettedev/Firesight/actions/workflows/ci.yml)
+
 A map of current Canadian wildfires, built as a portfolio project. It pulls live data from
 the Canadian Wildland Fire Information System (CWFIS), stores it in PostgreSQL/PostGIS, and
 serves it through a React map, a REST API, and MCP tools.
@@ -7,6 +9,8 @@ serves it through a React map, a REST API, and MCP tools.
 **Live:** https://firesight.codewheel.ca
 
 It is a demo, not an official wildfire service. See the [disclaimer](#disclaimer).
+
+![Firesight map of active wildfires across Canada, coloured by status](docs/images/firesight-map.webp)
 
 ## Features
 
@@ -58,3 +62,7 @@ cd src/Firesight.Web; npm test; npm run lint   # frontend
 Firesight is a demo. Do not use it for emergency, evacuation, or safety decisions. For
 official wildfire information, use [CWFIS](https://cwfis.cfs.nrcan.gc.ca/) and your provincial
 or territorial wildfire agency.
+
+## License
+
+[MIT](LICENSE)

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# The GITHUB_TOKEN each job gets can only read the repo. Nothing here needs to
+# write to GitHub (the deploy uses its own SSH key), so a compromised step can't
+# push code or change the repo.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: .NET build and test

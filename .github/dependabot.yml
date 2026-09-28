@@ -1,0 +1,40 @@
+# Dependabot opens pull requests when dependencies have updates. CI runs on each
+# one, so a passing PR is safe to merge (merging to main deploys it).
+version: 2
+updates:
+  # .NET packages for every project in the solution
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # One PR for all small updates instead of one PR per package.
+      nuget-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Frontend packages
+  - package-ecosystem: npm
+    directory: /src/Firesight.Web
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Actions used in .github/workflows, including the deploy action pinned to a
+  # commit. Dependabot updates the pinned commit and its version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Base images in the Dockerfile (Node, .NET SDK, ASP.NET runtime)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Moving to a new major version (e.g. .NET 11, Node 25) is a deliberate
+      # upgrade, not a routine bump.
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
