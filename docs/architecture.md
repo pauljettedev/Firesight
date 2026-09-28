@@ -26,7 +26,7 @@ hourly CWFIS sync, and (in production) the built React app.
 
 | Project | What it does | What it must not do |
 | --- | --- | --- |
-| `Firesight.Domain` | Core models, such as `Wildfire` | Reference the database, HTTP, CWFIS, or Claude |
+| `Firesight.Domain` | Core models and wildfire rules (`Wildfire`, `WildfireRules`) | Reference the database, HTTP, CWFIS, or Claude |
 | `Firesight.Application` | Use cases (list fires, find fires nearby, sync state) and input validation | Know how data is stored or fetched |
 | `Firesight.Infrastructure` | Database access, CWFIS client, Nominatim geocoding, Claude client, the hourly sync | |
 | `Firesight.Api` | REST endpoints, error handling, rate limits | Contain business rules |
@@ -34,8 +34,16 @@ hourly CWFIS sync, and (in production) the built React app.
 | `Firesight.Web` | The React map UI | |
 
 The REST API and MCP both call the same Application services, so rules are written once
-([ADR 005](decisions/005-layered-backend.md)). Error handling is in
-[ADR 009](decisions/009-api-errors.md).
+([ADR 005](decisions/005-layered-backend.md)).
+
+Rules that decide which records to return are written once in Domain as
+`Expression<Func<T, bool>>` (for example `WildfireRules.IsWithinRetention`). Repositories
+combine them with `.Where(...)` rather than repeating the condition inline. EF Core turns
+the expression into SQL, so the database still does the filtering, and the rule can be unit
+tested against an in-memory list. Rules about a single loaded record are methods on the
+model (for example `Wildfire.IsStale`, `Wildfire.RecordStatus`).
+
+Error handling is in [ADR 009](decisions/009-api-errors.md).
 
 ## Frontend
 

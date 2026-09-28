@@ -50,12 +50,16 @@ Mcp ------------> Application
  +--------------> Infrastructure
 ```
 
-- **Firesight.Domain** — core models only (e.g. `Wildfire`). No EF Core, Npgsql, HTTP, Claude/Anthropic, or CWFIS references. Uses NetTopologySuite geometry types for spatial data.
+- **Firesight.Domain** — core models and wildfire business rules (e.g. `Wildfire`, `WildfireRules`). No EF Core, Npgsql, HTTP, Claude/Anthropic, or CWFIS references. Uses NetTopologySuite geometry types for spatial data.
 - **Firesight.Application** — use cases/orchestration (`WildfireService`, `IAskFiresightService` etc.), DTOs, validation. Both the REST API and MCP tools must reuse this layer rather than duplicating business or spatial-query logic.
 - **Firesight.Infrastructure** — EF Core, Npgsql, PostGIS, CWFIS client, Nominatim geocoding, Claude (Anthropic) client for Ask Firesight, hosted sync background service, persistence implementations.
 - **Firesight.Api** — ASP.NET Core minimal API endpoints, DTO mapping, centralized error handling. Business logic must not live here.
 - **Firesight.Mcp** — MCP tool definitions that delegate to Application services; must not duplicate business/spatial logic or talk to the database directly.
 - **Firesight.Web** — React/TypeScript/MUI/MapLibre frontend; Vite proxies `/api` to the backend in dev.
+
+### Query rules
+
+Write business rules once in Domain and reuse them; never repeat a filter inline in a repository query. See "Projects" in `docs/architecture.md`.
 
 ### API error handling
 

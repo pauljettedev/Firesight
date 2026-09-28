@@ -20,16 +20,11 @@ public sealed class WildfireRepository(
     public async Task<IReadOnlyList<WildfireDto>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
-        var nowUtc = DateTime.UtcNow;
-        var extinguishedCutoffUtc = nowUtc.AddDays(-_retentionOptions.ExtinguishedDays);
-        var staleCutoffUtc = nowUtc.AddHours(-_freshnessOptions.StaleAfterHours);
+        var (extinguishedCutoffUtc, staleCutoffUtc) = GetCutoffs();
 
         var wildfires = await dbContext.Wildfires
             .AsNoTracking()
-            .Where(fire =>
-                fire.Status != "EX" ||
-                fire.FirstObservedExtinguishedUtc == null ||
-                fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc)
+            .Where(WildfireRules.IsWithinRetention(extinguishedCutoffUtc))
             .OrderByDescending(fire => fire.AreaHectares)
             .ToListAsync(cancellationToken);
 
@@ -42,17 +37,12 @@ public sealed class WildfireRepository(
         string externalId,
         CancellationToken cancellationToken = default)
     {
-        var nowUtc = DateTime.UtcNow;
-        var extinguishedCutoffUtc = nowUtc.AddDays(-_retentionOptions.ExtinguishedDays);
-        var staleCutoffUtc = nowUtc.AddHours(-_freshnessOptions.StaleAfterHours);
+        var (extinguishedCutoffUtc, staleCutoffUtc) = GetCutoffs();
 
         var wildfire = await dbContext.Wildfires
             .AsNoTracking()
-            .Where(fire =>
-                fire.ExternalId == externalId &&
-                (fire.Status != "EX" ||
-                 fire.FirstObservedExtinguishedUtc == null ||
-                 fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc))
+            .Where(fire => fire.ExternalId == externalId)
+            .Where(WildfireRules.IsWithinRetention(extinguishedCutoffUtc))
             .SingleOrDefaultAsync(cancellationToken);
 
         return wildfire is null
@@ -66,9 +56,8 @@ public sealed class WildfireRepository(
         double radiusKm,
         CancellationToken cancellationToken = default)
     {
-        var nowUtc = DateTime.UtcNow;
-        var extinguishedCutoffUtc = nowUtc.AddDays(-_retentionOptions.ExtinguishedDays);
-        var staleCutoffUtc = nowUtc.AddHours(-_freshnessOptions.StaleAfterHours);
+        var (extinguishedCutoffUtc, staleCutoffUtc) = GetCutoffs();
+
         // Search origin in WGS 84 longitude/latitude coordinates.
         var origin = new Point(longitude, latitude) { SRID = Wgs84Srid };
 
@@ -77,11 +66,8 @@ public sealed class WildfireRepository(
 
         var matches = await dbContext.Wildfires
             .AsNoTracking()
-            .Where(fire =>
-                (fire.Status != "EX" ||
-                 fire.FirstObservedExtinguishedUtc == null ||
-                 fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc) &&
-                fire.Location.IsWithinDistance(origin, radiusMeters))
+            .Where(WildfireRules.IsWithinRetention(extinguishedCutoffUtc))
+            .Where(fire => fire.Location.IsWithinDistance(origin, radiusMeters))
             .OrderBy(fire => fire.Location.Distance(origin))
             .Select(fire => new
             {
@@ -152,6 +138,15 @@ public sealed class WildfireRepository(
         return (inserted, changed, observed);
     }
 
+    private (DateTime ExtinguishedCutoffUtc, DateTime StaleCutoffUtc) GetCutoffs()
+    {
+        var nowUtc = DateTime.UtcNow;
+        var extinguishedCutoffUtc = nowUtc.AddDays(-_retentionOptions.ExtinguishedDays);
+        var staleCutoffUtc = nowUtc.AddHours(-_freshnessOptions.StaleAfterHours);
+
+        return (extinguishedCutoffUtc, staleCutoffUtc);
+    }
+
     private static WildfireDto ToDto(Wildfire fire, DateTime staleCutoffUtc) =>
         new(
             fire.Id,
@@ -165,14 +160,12 @@ public sealed class WildfireRepository(
             fire.Status,
             fire.StatusDateUtc,
             fire.LastSeenInFeedUtc,
-            fire.LastSeenInFeedUtc < staleCutoffUtc);
+            fire.IsStale(staleCutoffUtc));
 
     private static bool HasSourceChanges(
         Wildfire wildfire,
         WildfireImportRecord incoming)
     {
-        var effectiveStatusDateUtc = incoming.StatusDateUtc ?? wildfire.StatusDateUtc;
-
         return wildfire.Agency != incoming.Agency ||
                wildfire.Name != incoming.Name ||
                wildfire.Location.Y != incoming.Latitude ||
@@ -180,7 +173,7 @@ public sealed class WildfireRepository(
                wildfire.StartDate != incoming.StartDate ||
                wildfire.AreaHectares != incoming.AreaHectares ||
                wildfire.Status != incoming.Status ||
-               wildfire.StatusDateUtc != effectiveStatusDateUtc;
+               wildfire.StatusDateUtc != wildfire.EffectiveStatusDate(incoming.StatusDateUtc);
     }
 
     private static void Apply(
@@ -194,17 +187,9 @@ public sealed class WildfireRepository(
         wildfire.StartDate = incoming.StartDate;
         wildfire.AreaHectares = incoming.AreaHectares;
 
-        if (string.Equals(incoming.Status, "EX", StringComparison.OrdinalIgnoreCase))
-        {
-            wildfire.FirstObservedExtinguishedUtc ??= observedAtUtc;
-        }
-        else
-        {
-            wildfire.FirstObservedExtinguishedUtc = null;
-        }
-
-        wildfire.Status = incoming.Status;
-        wildfire.StatusDateUtc = incoming.StatusDateUtc ?? wildfire.StatusDateUtc;
-        wildfire.LastSeenInFeedUtc = observedAtUtc;
+        wildfire.RecordStatus(
+            incoming.Status,
+            incoming.StatusDateUtc,
+            observedAtUtc);
     }
 }
