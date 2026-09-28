@@ -1,7 +1,8 @@
-import { Box, Typography } from '@mui/material'
+import { Box, Stack, Typography } from '@mui/material'
 import firesightHeaderBackground from '../assets/firesight-header-background.png'
 import firesightLogo from '../assets/firesight-logo.png'
 import { DemoNotice } from './DemoNotice'
+import { SourceLink } from './SourceLink'
 
 export function AppHeader() {
   return (
@@ -81,25 +82,31 @@ export function AppHeader() {
           </Typography>
         </Box>
 
-        <Box
+        <Stack
+          spacing={0.75}
           sx={{
-            display: { xs: 'none', md: 'block' },
+            display: { xs: 'none', md: 'flex' },
             justifySelf: 'end',
+            alignItems: 'flex-end',
           }}
         >
           <DemoNotice />
-        </Box>
+          <SourceLink />
+        </Stack>
       </Box>
 
-      <Box
+      <Stack
+        spacing={0.75}
         sx={{
-          display: { xs: 'block', md: 'none' },
+          display: { xs: 'flex', md: 'none' },
+          alignItems: 'flex-start',
           px: 1.5,
           pb: 1,
         }}
       >
         <DemoNotice />
-      </Box>
+        <SourceLink />
+      </Stack>
     </Box>
   )
 }
