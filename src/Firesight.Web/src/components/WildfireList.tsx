@@ -54,7 +54,7 @@ export function WildfireList({
       {shown.length < wildfires.length && (
         <Typography
           variant="caption"
-          color="text.secondary"
+          color="textSecondary"
           sx={{ display: 'block', mt: 1 }}
         >
           Showing the first {shown.length} of {wildfires.length.toLocaleString()}.

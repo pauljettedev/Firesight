@@ -27,7 +27,7 @@ export function SummaryMetric({
     >
       <Typography
         variant="caption"
-        color="text.secondary"
+        color="textSecondary"
         sx={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}
       >
         {label}

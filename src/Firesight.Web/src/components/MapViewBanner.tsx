@@ -28,7 +28,7 @@ export function MapViewBanner({ mapView }: MapViewBannerProps) {
       <Typography variant="body2" sx={{ fontWeight: 700 }}>
         {title}
       </Typography>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="textSecondary">
         {description}
       </Typography>
     </Paper>

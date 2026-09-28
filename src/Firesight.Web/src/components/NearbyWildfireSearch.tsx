@@ -133,7 +133,7 @@ export function NearbyWildfireSearch({
 
         {error && <Alert severity="error">{error}</Alert>}
 
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="textSecondary">
           Location search ©{' '}
           <Link
             href="https://www.openstreetmap.org/copyright"
@@ -150,7 +150,7 @@ export function NearbyWildfireSearch({
           {resolvedLocation && (
             <Typography
               variant="caption"
-              color="text.secondary"
+              color="textSecondary"
               sx={{ display: 'block', mb: 0.5 }}
             >
               Near {resolvedLocation}
@@ -164,7 +164,7 @@ export function NearbyWildfireSearch({
           {results.length === 0 ? (
             <Typography
               variant="body2"
-              color="text.secondary"
+              color="textSecondary"
               sx={{ mt: 1 }}
             >
               No wildfires were found within this radius.

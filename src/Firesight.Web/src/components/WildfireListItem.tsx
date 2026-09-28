@@ -69,7 +69,7 @@ export function WildfireListItem({
 
       <Typography
         variant="caption"
-        color="text.secondary"
+        color="textSecondary"
         sx={{ display: 'block', mt: 0.35 }}
       >
         {wildfire.agency} · {formatRelativeTime(updatedUtc)}
@@ -77,7 +77,7 @@ export function WildfireListItem({
 
       <Typography
         variant="caption"
-        color="text.secondary"
+        color="textSecondary"
         sx={{ display: 'block', mt: 0.15, opacity: 0.72 }}
       >
         {wildfire.externalId}

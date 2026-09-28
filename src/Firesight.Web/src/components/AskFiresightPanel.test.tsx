@@ -116,4 +116,39 @@ describe('AskFiresightPanel', () => {
       screen.queryByRole('button', { name: /on map/ }),
     ).not.toBeInTheDocument()
   })
+
+  it('shows the asked question with the answer and clears the input', async () => {
+    mockedAskFiresight.mockResolvedValue(answer({}))
+    await ask()
+
+    await screen.findByText('An answer.')
+    expect(screen.getByText('a question')).toBeInTheDocument()
+    expect(
+      screen.getByRole('textbox', { name: 'Ask Firesight question' }),
+    ).toHaveValue('')
+  })
+
+  it('keeps the answer while the next question is typed', async () => {
+    mockedAskFiresight.mockResolvedValue(answer({}))
+    const user = await ask()
+
+    await screen.findByText('An answer.')
+    await user.type(
+      screen.getByRole('textbox', { name: 'Ask Firesight question' }),
+      'a follow-up',
+    )
+
+    expect(screen.getByText('An answer.')).toBeInTheDocument()
+    expect(screen.getByText('a question')).toBeInTheDocument()
+  })
+
+  it('puts the question back in the input when asking fails', async () => {
+    mockedAskFiresight.mockRejectedValue(new Error('Too many requests.'))
+    await ask()
+
+    await screen.findByText('Too many requests.')
+    expect(
+      screen.getByRole('textbox', { name: 'Ask Firesight question' }),
+    ).toHaveValue('a question')
+  })
 })

@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import {
   Alert,
-  Box,
   Button,
-  Chip,
   CircularProgress,
   Typography,
 } from '@mui/material'
@@ -15,6 +13,7 @@ import type { Wildfire } from '../services/wildfireService'
 import { errorMessage } from '../utils/errorMessage'
 import { wildfiresWithExternalIds } from '../utils/mapView'
 import { formatRadius } from '../utils/wildfirePresentation'
+import { AnswerCard } from './AnswerCard'
 import { MaxListedWildfires, WildfireList } from './WildfireList'
 
 const toolLabels: Record<string, string> = {
@@ -36,9 +35,9 @@ interface AskFiresightAnswerProps {
   onFocusWildfire: (wildfire: Wildfire) => void
 }
 
-// One Ask Firesight answer: the text, the fires it names (clickable, like the
-// Recent tab), a button to show them or the searched area on the map, and
-// which tools were used.
+// One Ask Firesight answer, styled as a reply: the text, the fires it names
+// (clickable, like the Recent tab), a link to show them or the searched area
+// on the map, and which data it was based on.
 export function AskFiresightAnswer({
   result,
   wildfires,
@@ -69,7 +68,7 @@ export function AskFiresightAnswer({
   }
 
   return (
-    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 1.5 }}>
+    <AnswerCard>
       <Typography
         variant="body2"
         sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, overflowWrap: 'anywhere' }}
@@ -116,24 +115,19 @@ export function AskFiresightAnswer({
         </Alert>
       )}
 
+      {/* Plain text rather than chips, so it reads as a footnote and not
+          as more buttons. */}
       {result.toolsUsed.length > 0 && (
-        <Box sx={{ mt: 1.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {result.toolsUsed.map((tool) => (
-            <Chip
-              key={tool}
-              label={toolLabels[tool] ?? tool}
-              size="small"
-              variant="outlined"
-              sx={{
-                height: 22,
-                maxWidth: '100%',
-                '& .MuiChip-label': { px: 0.75, fontSize: '0.68rem' },
-              }}
-            />
-          ))}
-        </Box>
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ display: 'block', mt: 1.25 }}
+        >
+          Based on:{' '}
+          {result.toolsUsed.map((tool) => toolLabels[tool] ?? tool).join(' · ')}
+        </Typography>
       )}
-    </Box>
+    </AnswerCard>
   )
 }
 
@@ -148,11 +142,16 @@ function ShowOnMapButton({ onClick, disabled, children }: ShowOnMapButtonProps) 
     <Button
       type="button"
       size="small"
-      variant="outlined"
-      fullWidth
+      variant="text"
       disabled={disabled}
       onClick={onClick}
-      sx={{ mt: 1.5, textTransform: 'none' }}
+      sx={{
+        mt: 1,
+        px: 0,
+        minWidth: 0,
+        textTransform: 'none',
+        fontWeight: 600,
+      }}
     >
       {children}
     </Button>

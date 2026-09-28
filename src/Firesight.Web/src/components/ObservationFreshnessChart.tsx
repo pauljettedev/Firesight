@@ -36,7 +36,7 @@ export function ObservationFreshnessChart({
 
         <Typography
           variant="caption"
-          color="text.secondary"
+          color="textSecondary"
           sx={{ alignSelf: { xs: 'flex-start', md: 'flex-end' } }}
         >
           {wildfires.length.toLocaleString()} observations
@@ -68,7 +68,7 @@ export function ObservationFreshnessChart({
                 </Typography>
                 <Typography
                   variant="caption"
-                  color="text.secondary"
+                  color="textSecondary"
                   sx={{ display: { xs: 'none', sm: 'block' } }}
                 >
                   {bucket.description}

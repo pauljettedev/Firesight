@@ -48,7 +48,7 @@ export function AppBrand() {
         </Typography>
         <Typography
           variant="caption"
-          color="text.secondary"
+          color="textSecondary"
           sx={{ letterSpacing: '0.08em', textTransform: 'uppercase' }}
         >
           Canadian wildfire situational awareness

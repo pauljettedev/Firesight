@@ -12,13 +12,13 @@ export function SectionHeading({ title, subtitle }: SectionHeadingProps) {
     <Box>
       <Typography
         variant="overline"
-        color="text.secondary"
+        color="textSecondary"
         sx={{ letterSpacing: '0.1em' }}
       >
         {title}
       </Typography>
 
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+      <Typography variant="body2" color="textSecondary" sx={{ mt: 0.25 }}>
         {subtitle}
       </Typography>
     </Box>
