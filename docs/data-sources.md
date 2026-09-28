@@ -113,5 +113,5 @@ Nominatim's usage policy asks for light use and an identifying app name, so Fire
 ## Map background: OpenStreetMap
 
 The map uses OpenStreetMap's public tile server (`tile.openstreetmap.org`), with the required
-"© OpenStreetMap contributors" credit shown on the map. That server is meant for light use,
-which suits a demo; a site with real traffic would need its own tile provider.
+"© OpenStreetMap contributors" credit shown on the map. OpenStreetMap's tile policy allows
+this for light use like Firesight's.
