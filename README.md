@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/pauljettedev/Firesight/actions/workflows/ci.yml/badge.svg)](https://github.com/pauljettedev/Firesight/actions/workflows/ci.yml)
 
-A map of current Canadian wildfires, built as a portfolio project. It pulls live data from
-the Canadian Wildland Fire Information System (CWFIS), stores it in PostgreSQL/PostGIS, and
-serves it through a React map, a REST API, and MCP tools.
+A live map of Canadian wildfires, built as a portfolio project. It syncs data from the
+Canadian Wildland Fire Information System (CWFIS) every hour, stores it in PostgreSQL/PostGIS,
+and serves it through a React map, a REST API, MCP tools for AI assistants, and a
+plain-English question box answered by Claude.
 
-**Live:** https://firesight.codewheel.ca
-
-It is a demo, not an official wildfire service. See the [disclaimer](#disclaimer).
+**Live:** https://firesight.codewheel.ca · a demo, not an official wildfire service
+([disclaimer](#disclaimer))
 
 ![Firesight map of active wildfires across Canada, coloured by status](docs/images/firesight-map.webp)
 
@@ -16,15 +16,50 @@ It is a demo, not an official wildfire service. See the [disclaimer](#disclaimer
 
 - Map of current wildfires with status, size, and how recently each fire was reported
 - Find fires within a distance of a town or city
-- **Ask Firesight:** ask questions in plain English ("any fires near Kamloops?"), answered by
-  Claude using Firesight's own data
+- **Ask Firesight:** ask questions in plain English ("any fires near Kamloops?")
 - MCP tools, so AI assistants can query the same data
-- Hourly sync from CWFIS
+
+## Under the hood
+
+**AI answers checked against real data.** Ask Firesight gives Claude tools that call
+Firesight's own services. Claude decides what to look up, but for "how many", "are there
+any", and "what's the status of" questions, the code works out the answer from the actual
+results instead of trusting the model to count. The fires Claude links to an answer are
+checked against the fires its tools really returned, and any it made up are dropped.
+Requests are rate limited and length capped to keep cost bounded.
+
+**One set of business logic, three front doors.** The REST API, the MCP tools, and Ask
+Firesight all call the same application services, so spatial queries and rules are written
+once. Business rules live in the domain layer as expressions that EF Core turns into SQL, so
+they're unit tested without a database but still run as `WHERE` clauses in PostGIS.
+
+**Careful data sync.** CWFIS publishes a time-versioned feed. Each sync reads every page at
+the same snapshot instant, with a fixed sort order, so a record can't be skipped or counted
+twice. The sync is all-or-nothing: if any page fails, nothing is applied. Records without an
+ID are rejected and counted rather than guessed at.
+
+**Honest about freshness.** Firesight tracks when the feed was last fetched separately from
+when each fire was last seen in it. A fire missing from recent syncs is flagged as stale,
+but its official status is never changed. Firesight only reports what CWFIS said.
+
+**Spatial search in the database.** "Fires within 200 km of Ottawa" is a PostGIS geography
+query (`ST_DWithin`), measured in real distances on the globe and sorted by distance.
+
+**Tested against the real thing.** Integration tests start a disposable PostGIS container,
+apply the real migrations, and run the actual spatial queries and MCP transport, not
+in-memory fakes. The UI has its own component tests.
+
+**Shipped, not just built.** Every push to `main` runs the tests, then deploys to a
+DigitalOcean droplet over SSH. The deploy action is pinned to a commit and the server's
+identity is checked before connecting.
+
+Why each of these was built this way is written up in the
+[decision records](docs/decisions/README.md).
 
 ## Stack
 
 React, TypeScript, MUI, MapLibre · ASP.NET Core (.NET 10), EF Core · PostgreSQL/PostGIS ·
-Claude API, MCP · Docker, GitHub Actions
+Claude API, MCP · Docker, GitHub Actions, Caddy
 
 ## Run locally
 
