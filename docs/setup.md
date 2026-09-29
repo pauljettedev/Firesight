@@ -8,7 +8,7 @@ repository root unless noted.
 - Git
 - Docker Desktop
 - .NET 10 SDK
-- Node.js LTS
+- Node.js 24
 
 ## 2. Get the code
 
@@ -25,19 +25,21 @@ With Docker Desktop running:
 docker compose up -d
 ```
 
-This runs PostgreSQL with PostGIS in a container. You don't need to create any tables: the
-API does that itself when it starts.
+This runs PostgreSQL with PostGIS in a container.
+
+You don't need to create any tables. The API creates and updates them itself when it starts.
 
 ## 4. Add your Claude API key (optional)
 
-Only Ask Firesight needs this. Everything else works without it.
+Only Ask Firesight needs this. Without it, asking a question returns an error, and everything
+else works normally.
 
 ```powershell
 dotnet user-secrets set "Claude:ApiKey" "<your key>" --project src/Firesight.Api
 ```
 
 Get a key from the [Anthropic Console](https://console.anthropic.com/). User secrets are stored
-outside the repository, so the key can't be committed by accident.
+on your machine outside the repository, so the key can't be committed by accident.
 
 ## 5. Start the API
 
@@ -45,8 +47,11 @@ outside the repository, so the key can't be committed by accident.
 dotnet run --project src/Firesight.Api
 ```
 
-The API runs at `http://localhost:5213`. On startup it loads current fires from CWFIS, then
-refreshes every hour. If CWFIS is down, the API still starts and serves whatever it already has.
+The API runs at `http://localhost:5213`. It needs the database from step 3; if the database
+isn't running, the API stops with an error.
+
+When it starts, it loads the current fires from CWFIS, then refreshes them every hour. If CWFIS
+is down, the API still starts and serves whatever it already has.
 
 Check it's working: `http://localhost:5213/api/health`
 
@@ -60,7 +65,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The dev server forwards `/api` requests to the API.
+Open `http://localhost:5173`. The web app sends its `/api` requests on to the API from step 5.
 
 ## Run the tests
 
@@ -72,8 +77,10 @@ npm run lint
 npm run build                        # type-check and production build
 ```
 
-The backend integration tests start their own throwaway PostGIS database in Docker, so Docker
-must be running.
+The backend integration tests start their own temporary PostGIS database in Docker, so Docker
+Desktop must be running. They don't touch the database from step 3.
+
+CI runs the same commands on every push.
 
 ## Stop everything
 
@@ -83,4 +90,5 @@ Press `Ctrl+C` in the API and web app terminals, then:
 docker compose down
 ```
 
-Your data is kept in a Docker volume and will still be there next time.
+Your data is kept in a Docker volume and will still be there next time. To delete it and
+start with an empty database, use `docker compose down -v` instead.
