@@ -19,6 +19,17 @@ plain-English question box answered by Claude.
 - **Ask Firesight:** ask questions in plain English ("any fires near Kamloops?")
 - MCP tools, so AI assistants can query the same data
 
+## Try it with an AI assistant
+
+Firesight's MCP server is public. To connect Claude Code to it:
+
+```bash
+claude mcp add --transport http firesight https://firesight.codewheel.ca/mcp
+```
+
+Then ask Claude something like "what are the largest wildfires in BC right now?". It looks the
+answer up in Firesight's live data. More detail: [MCP](docs/mcp.md).
+
 ## Under the hood
 
 **AI answers checked against real data.** Ask Firesight gives Claude tools that call
