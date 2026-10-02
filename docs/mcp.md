@@ -11,7 +11,12 @@ up its wildfire data themselves. It's part of the API, served at `/mcp` over HTT
 There's no login and no rate limit, the same as the REST wildfire endpoints. Each request
 stands on its own; the server keeps no session between calls.
 
-To add it to Claude Code:
+## Connecting
+
+**Claude (web and desktop apps).** Open Settings → Connectors, choose Add custom connector, and
+enter `https://firesight.codewheel.ca/mcp`. The tools then work in any new chat.
+
+**Claude Code on your own computer.** Run:
 
 ```bash
 claude mcp add --transport http --scope user firesight https://firesight.codewheel.ca/mcp
@@ -20,6 +25,10 @@ claude mcp add --transport http --scope user firesight https://firesight.codewhe
 `--scope user` makes it available in every Claude Code session. Without it, Claude Code only
 adds it for the folder you ran the command in. The server is picked up when a session starts,
 so start a new one afterwards; `/mcp` inside Claude Code shows whether it's connected.
+
+Claude Code on the web runs in a cloud container whose network policy may block
+firesight.codewheel.ca, so the command can fail there even though the server is fine. Use the
+connector above instead.
 
 ## Tools
 
@@ -60,3 +69,7 @@ expect. .NET describes a field that can be null, such as `name` or `areaHectares
 `"type": ["string", "null"]`. Some MCP clients reject that, so Firesight publishes those fields
 as `anyOf: [{ "type": "string" }, { "type": "null" }]` instead. Both mean the same thing. This
 only changes the published description; the data itself is the same.
+
+Every field is listed as required, so a null field is always sent as `null` rather than left
+out. The MCP library leaves nulls out by default, and strict clients such as Claude Code reject
+a result with a required field missing.
