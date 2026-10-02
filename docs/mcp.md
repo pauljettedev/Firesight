@@ -14,8 +14,12 @@ stands on its own; the server keeps no session between calls.
 To add it to Claude Code:
 
 ```bash
-claude mcp add --transport http firesight https://firesight.codewheel.ca/mcp
+claude mcp add --transport http --scope user firesight https://firesight.codewheel.ca/mcp
 ```
+
+`--scope user` makes it available in every Claude Code session. Without it, Claude Code only
+adds it for the folder you ran the command in. The server is picked up when a session starts,
+so start a new one afterwards; `/mcp` inside Claude Code shows whether it's connected.
 
 ## Tools
 
