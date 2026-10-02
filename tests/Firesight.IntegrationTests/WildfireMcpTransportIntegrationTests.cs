@@ -120,6 +120,64 @@ public sealed class WildfireMcpTransportIntegrationTests
     }
 
     [Fact]
+    public async Task RadiusTool_WritesNullFieldsExplicitly_SoResultsMatchTheRequiredSchemaFields()
+    {
+        var wildfire = CreateWildfire("2026_ON_TEST_001", 45.5, -75.6) with
+        {
+            AreaHectares = null,
+            StatusDateUtc = null
+        };
+        var service = new StubWildfireService(
+            nearbyHandler: (_, _, _, _) =>
+                Task.FromResult<IReadOnlyList<NearbyWildfireDto>>(
+                [
+                    new NearbyWildfireDto(wildfire, 8.25)
+                ]));
+
+        await using var app = await CreateAppAsync(service);
+        await using var client = await CreateClientAsync(app);
+
+        var tools = await client.ListToolsAsync();
+        var outputSchema = GetOutputSchema(
+            tools.Single(tool => tool.Name == "find_wildfires_near_location"));
+        var required = outputSchema
+            .GetProperty("items")
+            .GetProperty("properties")
+            .GetProperty("wildfire")
+            .GetProperty("required")
+            .EnumerateArray()
+            .Select(property => property.GetString()!)
+            .ToList();
+
+        var result = await client.CallToolAsync(
+            "find_wildfires_near_location",
+            new Dictionary<string, object?>
+            {
+                ["latitude"] = 45.4215,
+                ["longitude"] = -75.6972,
+                ["radiusKm"] = 25d
+            });
+
+        Assert.NotNull(result.StructuredContent);
+        var returned = Assert.Single(result.StructuredContent.Value.EnumerateArray())
+            .GetProperty("wildfire");
+
+        // Strict MCP clients reject a result that leaves out a required field,
+        // even when the field's value is null.
+        foreach (var property in required)
+        {
+            Assert.True(
+                returned.TryGetProperty(property, out _),
+                $"Required field '{property}' is missing from the tool result.");
+        }
+
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("name").ValueKind);
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("startDate").ValueKind);
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("areaHectares").ValueKind);
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("statusDateUtc").ValueKind);
+    }
+
+    [Fact]
     public async Task RadiusTool_WhenApplicationValidationFails_ReturnsActionableToolError()
     {
         var service = new StubWildfireService(
