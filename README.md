@@ -21,14 +21,14 @@ plain-English question box answered by Claude.
 
 ## Try it with an AI assistant
 
-Firesight's MCP server is public. To connect Claude Code to it:
+Firesight's MCP server is public, with no login, so you can connect Claude to it in a minute:
 
-```bash
-claude mcp add --transport http firesight https://firesight.codewheel.ca/mcp
-```
+1. In [Claude](https://claude.ai), open **Settings → Connectors** and choose **Add custom connector**.
+2. Name it `Firesight` and enter `https://firesight.codewheel.ca/mcp`.
+3. In a new chat, ask something like "what's the nearest wildfire to Kamloops?"
 
-Then ask Claude something like "what are the largest wildfires in BC right now?". It looks the
-answer up in Firesight's live data. More detail: [MCP](docs/mcp.md).
+Claude calls Firesight's tools and answers from its live data. To use it from Claude Code
+instead, see [MCP](docs/mcp.md).
 
 ## Under the hood
 

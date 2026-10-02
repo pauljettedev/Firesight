@@ -81,16 +81,19 @@ public sealed class WildfireMcpTransportIntegrationTests
     {
         var wildfire = CreateWildfire("2026_ON_TEST_001", 45.5, -75.6);
         var service = new StubWildfireService(
-            nearbyHandler: (latitude, longitude, radiusKm, _) =>
+            nearbyHandler: (latitude, longitude, radiusKm, cancellationToken) =>
             {
+                // Check the tool passed the caller's arguments through unchanged.
                 Assert.Equal(45.4215, latitude);
                 Assert.Equal(-75.6972, longitude);
                 Assert.Equal(25, radiusKm);
 
-                return Task.FromResult<IReadOnlyList<NearbyWildfireDto>>(
+                IReadOnlyList<NearbyWildfireDto> results =
                 [
                     new NearbyWildfireDto(wildfire, 8.25)
-                ]);
+                ];
+
+                return Task.FromResult(results);
             });
 
         await using var app = await CreateAppAsync(service);
@@ -120,16 +123,89 @@ public sealed class WildfireMcpTransportIntegrationTests
     }
 
     [Fact]
+    public async Task RadiusTool_ReturnsEveryRequiredField_EvenWhenNull()
+    {
+        var wildfire = CreateWildfire("2026_ON_TEST_001", 45.5, -75.6) with
+        {
+            AreaHectares = null,
+            StatusDateUtc = null
+        };
+        var service = new StubWildfireService(
+            nearbyHandler: (latitude, longitude, radiusKm, cancellationToken) =>
+            {
+                // Whatever location is asked about, return our one test fire, 8.25 km away.
+                IReadOnlyList<NearbyWildfireDto> results =
+                [
+                    new NearbyWildfireDto(wildfire, 8.25)
+                ];
+
+                return Task.FromResult(results);
+            });
+
+        await using var app = await CreateAppAsync(service);
+        await using var client = await CreateClientAsync(app);
+
+        // Read the required fields from the schema the server publishes, so
+        // the test checks the output against the real contract.
+        var tools = await client.ListToolsAsync();
+        var radiusTool = tools.Single(tool => tool.Name == "find_wildfires_near_location");
+        var outputSchema = GetOutputSchema(radiusTool);
+        var wildfireSchema = outputSchema
+            .GetProperty("items")
+            .GetProperty("properties")
+            .GetProperty("wildfire");
+
+        var requiredFields = new List<string>();
+        foreach (var field in wildfireSchema.GetProperty("required").EnumerateArray())
+        {
+            requiredFields.Add(field.GetString() ?? "");
+        }
+
+        var result = await client.CallToolAsync(
+            "find_wildfires_near_location",
+            new Dictionary<string, object?>
+            {
+                ["latitude"] = 45.4215,
+                ["longitude"] = -75.6972,
+                ["radiusKm"] = 25d
+            });
+
+        Assert.NotNull(result.StructuredContent);
+        var items = result.StructuredContent.Value.EnumerateArray();
+        var item = Assert.Single(items);
+        var returned = item.GetProperty("wildfire");
+
+        // Strict MCP clients reject a result that leaves out a required field,
+        // even when the field's value is null.
+        foreach (var field in requiredFields)
+        {
+            Assert.True(
+                returned.TryGetProperty(field, out _),
+                $"Required field '{field}' is missing from the tool result.");
+        }
+
+        // These fields are null in the test fire. Checking them proves the loop
+        // was tested against real nulls, not fields that happened to have values.
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("name").ValueKind);
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("startDate").ValueKind);
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("areaHectares").ValueKind);
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("statusDateUtc").ValueKind);
+    }
+
+    [Fact]
     public async Task RadiusTool_WhenApplicationValidationFails_ReturnsActionableToolError()
     {
         var service = new StubWildfireService(
-            nearbyHandler: (_, _, _, _) =>
-                throw new ApplicationValidationException(
-                    new Dictionary<string, string[]>
-                    {
-                        ["latitude"] =
-                            ["Latitude must be a finite value between -90 and 90."]
-                    }));
+            nearbyHandler: (latitude, longitude, radiusKm, cancellationToken) =>
+            {
+                // Act as if the application layer rejected the latitude.
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["latitude"] = ["Latitude must be a finite value between -90 and 90."]
+                };
+
+                throw new ApplicationValidationException(errors);
+            });
 
         await using var app = await CreateAppAsync(service);
         await using var client = await CreateClientAsync(app);
@@ -157,18 +233,19 @@ public sealed class WildfireMcpTransportIntegrationTests
     public async Task RadiusTool_WhenMultipleValidationFailuresOccur_ReturnsAllValidationMessages()
     {
         var service = new StubWildfireService(
-            nearbyHandler: (_, _, _, _) =>
-                throw new ApplicationValidationException(
-                    new Dictionary<string, string[]>
-                    {
-                        // Deliberately not alphabetical: MCP error formatting should be deterministic.
-                        ["radiusKm"] =
-                            ["Radius must be a finite value greater than 0."],
-                        ["latitude"] =
-                            ["Latitude must be a finite value between -90 and 90."],
-                        ["longitude"] =
-                            ["Longitude must be a finite value between -180 and 180."]
-                    }));
+            nearbyHandler: (latitude, longitude, radiusKm, cancellationToken) =>
+            {
+                // Act as if the application layer rejected all three inputs.
+                // Deliberately not alphabetical: MCP error formatting should be deterministic.
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["radiusKm"] = ["Radius must be a finite value greater than 0."],
+                    ["latitude"] = ["Latitude must be a finite value between -90 and 90."],
+                    ["longitude"] = ["Longitude must be a finite value between -180 and 180."]
+                };
+
+                throw new ApplicationValidationException(errors);
+            });
 
         await using var app = await CreateAppAsync(service);
         await using var client = await CreateClientAsync(app);
@@ -213,8 +290,11 @@ public sealed class WildfireMcpTransportIntegrationTests
         const string secret = "database password should never reach the MCP client";
 
         var service = new StubWildfireService(
-            nearbyHandler: (_, _, _, _) =>
-                throw new InvalidOperationException(secret));
+            nearbyHandler: (latitude, longitude, radiusKm, cancellationToken) =>
+            {
+                // Act as if something unexpected failed, with sensitive text in the message.
+                throw new InvalidOperationException(secret);
+            });
 
         await using var app = await CreateAppAsync(service);
         await using var client = await CreateClientAsync(app);
@@ -327,14 +407,21 @@ public sealed class WildfireMcpTransportIntegrationTests
             DateTime.UtcNow,
             false);
 
+    // A fake wildfire service, so these tests don't need a database.
+    // nearbyHandler lets each test decide what FindWildfiresNearAsync does:
+    // it receives latitude, longitude, radiusKm and the cancellation token,
+    // and returns the nearby fires (or throws). Without one, no fires are found.
     private sealed class StubWildfireService(
         Func<double, double, double, CancellationToken,
             Task<IReadOnlyList<NearbyWildfireDto>>>? nearbyHandler = null)
         : IWildfireService
     {
         public Task<IReadOnlyList<WildfireDto>> GetActiveWildfiresAsync(
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<WildfireDto>>([]);
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<WildfireDto> noWildfires = [];
+            return Task.FromResult(noWildfires);
+        }
 
         public Task<WildfireDto?> GetWildfireByExternalIdAsync(
             string externalId,
@@ -345,9 +432,16 @@ public sealed class WildfireMcpTransportIntegrationTests
             double latitude,
             double longitude,
             double radiusKm,
-            CancellationToken cancellationToken = default) =>
-            nearbyHandler?.Invoke(latitude, longitude, radiusKm, cancellationToken)
-            ?? Task.FromResult<IReadOnlyList<NearbyWildfireDto>>([]);
+            CancellationToken cancellationToken = default)
+        {
+            if (nearbyHandler is null)
+            {
+                IReadOnlyList<NearbyWildfireDto> noWildfires = [];
+                return Task.FromResult(noWildfires);
+            }
+
+            return nearbyHandler(latitude, longitude, radiusKm, cancellationToken);
+        }
 
         public Task<WildfireFeedSyncStateDto?> GetFeedSyncStateAsync(
             CancellationToken cancellationToken = default) =>

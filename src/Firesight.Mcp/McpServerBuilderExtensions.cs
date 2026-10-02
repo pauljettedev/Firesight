@@ -1,15 +1,28 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Firesight.Mcp.Models;
 using Firesight.Mcp.Tools;
 using Microsoft.Extensions.DependencyInjection;
+using ModelContextProtocol;
 
 namespace Firesight.Mcp;
 
 public static class McpServerBuilderExtensions
 {
+    // The MCP library leaves null fields out of tool results by default.
+    // Our output schemas list every field as required, and strict clients
+    // (Claude Code, for one) reject a result with a required field missing.
+    // So we always write nulls, for every tool and every field.
+    // This copies the library's default settings and changes only that one.
+    private static readonly JsonSerializerOptions ToolJsonOptions =
+        new JsonSerializerOptions(McpJsonUtilities.DefaultOptions)
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.Never
+        };
+
     public static IMcpServerBuilder WithFiresightTools(this IMcpServerBuilder builder) =>
         builder
-            .WithTools<WildfireTools>()
+            .WithTools<WildfireTools>(ToolJsonOptions)
             .WithRequestFilters(filters =>
             {
                 filters.AddListToolsFilter(next => async (context, cancellationToken) =>
