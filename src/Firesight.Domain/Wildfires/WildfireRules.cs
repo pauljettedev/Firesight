@@ -10,11 +10,20 @@ public static class WildfireRules
 {
     public const string ExtinguishedStatus = "EX";
 
-    // A fire is kept until it has been extinguished for longer than the
-    // retention period. The period is counted from when Firesight first saw it
-    // as extinguished, not from the CWFIS status date.
-    public static Expression<Func<Wildfire, bool>> IsWithinRetention(DateTime extinguishedCutoffUtc) =>
+    // Keeps fires that aren't extinguished, or were first seen as extinguished
+    // (EX) after the cutoff. This hides fires that have been out for longer
+    // than the extinguished retention period. The period is counted from when
+    // Firesight first saw the fire as EX, not from the CWFIS status date.
+    public static Expression<Func<Wildfire, bool>> IsNotExtinguishedBefore(DateTime cutoffUtc) =>
         fire => fire.Status != ExtinguishedStatus ||
                 fire.FirstObservedExtinguishedUtc == null ||
-                fire.FirstObservedExtinguishedUtc > extinguishedCutoffUtc;
+                fire.FirstObservedExtinguishedUtc > cutoffUtc;
+
+    // Keeps fires seen in the feed after the cutoff. This hides fires that
+    // have been missing from the feed for longer than the missing retention
+    // period. CWFIS often drops a fire when it goes out instead of reporting
+    // EX, so without this, those fires would stay on the map forever. Hidden
+    // fires aren't deleted, and reappear if CWFIS reports them again.
+    public static Expression<Func<Wildfire, bool>> IsSeenInFeedSince(DateTime cutoffUtc) =>
+        fire => fire.LastSeenInFeedUtc > cutoffUtc;
 }

@@ -66,6 +66,9 @@ public static class DependencyInjection
             .Validate(
                 options => options.ExtinguishedDays >= 0,
                 "WildfireRetention:ExtinguishedDays must be zero or greater.")
+            .Validate(
+                options => options.MissingFromFeedDays >= 1,
+                "WildfireRetention:MissingFromFeedDays must be at least 1.")
             .ValidateOnStart();
 
         services.AddOptions<WildfireFreshnessOptions>()

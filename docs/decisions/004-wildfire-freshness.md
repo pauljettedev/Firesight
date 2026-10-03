@@ -21,3 +21,16 @@ tell us its status changed.
 
 - The UI can show "the feed was checked recently" separately from "this fire was seen recently".
 - Stale is a Firesight data-quality flag only. It never changes the CWFIS status.
+
+## Update, October 2026: hide fires missing for 5 days
+
+We first kept missing fires on the map until CWFIS reported them as extinguished (`EX`). Live
+data showed the active-fires layer rarely does that. On October 3, 2026, none of the 421 fires
+Firesight showed were `EX`, and 138 hadn't been in the feed for over a week, most still listed
+as out of control. CWFIS was dropping fires instead of marking them out, so the map filled up
+with fires that were probably out.
+
+Fires missing from the feed for 5 days (`WildfireRetention:MissingFromFeedDays`) are now
+hidden, counted from the last successful sync so a CWFIS outage doesn't hide everything. Their
+status still isn't changed, and they reappear if CWFIS reports them again. `EX` is still handled
+the same way as before ([data-sources.md](../data-sources.md)).

@@ -3,7 +3,7 @@ using NetTopologySuite.Geometries;
 
 namespace Firesight.UnitTests;
 
-// Tests the wildfire rules directly, with no database. IsWithinRetention is run
+// Tests the wildfire rules directly, with no database. Each rule is run
 // through an in-memory list with AsQueryable(), which uses the same expression
 // the repository hands to EF Core.
 public sealed class WildfireRulesTests
@@ -17,7 +17,7 @@ public sealed class WildfireRulesTests
     [InlineData("EX", 3, true)]
     [InlineData("EX", 7, false)]
     [InlineData("EX", 10, false)]
-    public void IsWithinRetention_DropsFiresExtinguishedForRetentionPeriodOrLonger(
+    public void IsNotExtinguishedBefore_DropsFiresExtinguishedForRetentionPeriodOrLonger(
         string status,
         int? daysSinceFirstExtinguished,
         bool expectedKept)
@@ -29,13 +29,33 @@ public sealed class WildfireRulesTests
         }
 
         var extinguishedCutoffUtc = NowUtc.AddDays(-7);
-
         var kept = new[] { fire }
             .AsQueryable()
-            .Where(WildfireRules.IsWithinRetention(extinguishedCutoffUtc))
+            .Where(WildfireRules.IsNotExtinguishedBefore(extinguishedCutoffUtc))
             .ToList();
 
-        Assert.Equal(expectedKept, kept.Any());
+        Assert.Equal(expectedKept, kept.Count == 1);
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    [InlineData(30, false)]
+    public void IsSeenInFeedSince_DropsFiresMissingForRetentionPeriodOrLonger(
+        int daysSinceLastSeen,
+        bool expectedKept)
+    {
+        var fire = CreateFire("OC");
+        fire.LastSeenInFeedUtc = NowUtc.AddDays(-daysSinceLastSeen);
+
+        var missingFromFeedCutoffUtc = NowUtc.AddDays(-5);
+        var kept = new[] { fire }
+            .AsQueryable()
+            .Where(WildfireRules.IsSeenInFeedSince(missingFromFeedCutoffUtc))
+            .ToList();
+
+        Assert.Equal(expectedKept, kept.Count == 1);
     }
 
     [Theory]
@@ -92,7 +112,7 @@ public sealed class WildfireRulesTests
     [Fact]
     public void RecordStatus_LowercaseEx_IsNotTreatedAsExtinguished()
     {
-        // Must match IsWithinRetention, which compares exactly in SQL.
+        // Must match IsNotExtinguishedBefore, which compares exactly in SQL.
         var fire = CreateFire("UC");
 
         fire.RecordStatus("ex", NowUtc, NowUtc);

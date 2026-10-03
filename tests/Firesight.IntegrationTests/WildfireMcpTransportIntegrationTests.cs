@@ -51,10 +51,10 @@ public sealed class WildfireMcpTransportIntegrationTests
 
         var tools = await client.ListToolsAsync();
 
-        // Without this guidance, models guess that fires missing from the feed are out.
+        // Without this guidance, models state that stale fires are out.
         foreach (var tool in tools)
         {
-            Assert.Contains("It does not mean the fire is out.", tool.Description);
+            Assert.Contains("a stale fire may be out", tool.Description);
             Assert.Contains("UC (under control)", tool.Description);
         }
     }

@@ -21,8 +21,8 @@ AI assistants can use the same data through the MCP server at `/mcp` ([mcp.md](m
 ## GET /api/wildfires
 
 Returns every fire the map shows, largest first. That's the current fires, including stale
-ones, and extinguished fires for 7 days after Firesight first saw them as extinguished
-([data-sources.md](data-sources.md)).
+ones, but not fires missing from the feed for 5 days or more. Extinguished fires are shown for
+7 days after Firesight first saw them as extinguished ([data-sources.md](data-sources.md)).
 
 Each fire has:
 

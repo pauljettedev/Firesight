@@ -1,5 +1,6 @@
 using Firesight.Application.Wildfires;
 using Firesight.Domain.Wildfires;
+using Firesight.Infrastructure.Persistence.Sync;
 using Firesight.Infrastructure.Wildfires;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -128,12 +129,101 @@ public sealed class WildfireRepositoryIntegrationTests(PostgisFixture fixture)
         Assert.Contains(visible, fire => fire.ExternalId == recentId);
     }
 
+    [Fact]
+    public async Task GetAllAsync_HidesFireMissingFromFeedAfterRetentionWindow()
+    {
+        var missingId = UniqueId("missing");
+        var recentlySeenId = UniqueId("recently-seen");
+        var now = DateTime.UtcNow;
+
+        await using var dbContext = fixture.CreateDbContext();
+
+        dbContext.Wildfires.AddRange(
+            CreateActiveFire(missingId, lastSeenInFeedUtc: now.AddDays(-6)),
+            CreateActiveFire(recentlySeenId, lastSeenInFeedUtc: now.AddDays(-2)));
+        await dbContext.SaveChangesAsync();
+
+        await SetLastSuccessfulFetchAsync(dbContext, now);
+
+        var repository = CreateRepository(dbContext);
+        var visible = await repository.GetAllAsync();
+
+        Assert.DoesNotContain(visible, fire => fire.ExternalId == missingId);
+        Assert.Contains(visible, fire => fire.ExternalId == recentlySeenId);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WhenCwfisHasBeenDown_CountsMissingFromLastSuccessfulSync()
+    {
+        // The last successful sync was 10 days ago. A fire seen in that sync
+        // wasn't missing from it, so it must still be shown. A fire that was
+        // already missing for 6 days before the outage is still hidden.
+        var seenInLastSyncId = UniqueId("seen-in-last-sync");
+        var missingBeforeOutageId = UniqueId("missing-before-outage");
+        var now = DateTime.UtcNow;
+        var lastSuccessfulSyncUtc = now.AddDays(-10);
+
+        await using var dbContext = fixture.CreateDbContext();
+
+        dbContext.Wildfires.AddRange(
+            CreateActiveFire(seenInLastSyncId, lastSeenInFeedUtc: lastSuccessfulSyncUtc),
+            CreateActiveFire(missingBeforeOutageId, lastSeenInFeedUtc: lastSuccessfulSyncUtc.AddDays(-6)));
+        await dbContext.SaveChangesAsync();
+
+        await SetLastSuccessfulFetchAsync(dbContext, lastSuccessfulSyncUtc);
+
+        var repository = CreateRepository(dbContext);
+        var visible = await repository.GetAllAsync();
+
+        Assert.Contains(visible, fire => fire.ExternalId == seenInLastSyncId);
+        Assert.DoesNotContain(visible, fire => fire.ExternalId == missingBeforeOutageId);
+    }
+
+    // Sets when the feed was last read. Tests share one database, so this
+    // updates the sync row if an earlier test already created it.
+    private static async Task SetLastSuccessfulFetchAsync(
+        Firesight.Infrastructure.Persistence.FiresightDbContext dbContext,
+        DateTime lastSuccessfulFetchUtc)
+    {
+        var state = await dbContext.CwfisSyncStates.SingleOrDefaultAsync(
+            item => item.Source == CwfisSyncState.SourceKey);
+
+        if (state is null)
+        {
+            state = new CwfisSyncState();
+            dbContext.CwfisSyncStates.Add(state);
+        }
+
+        state.LastAttemptUtc = lastSuccessfulFetchUtc;
+        state.LastSuccessfulFetchUtc = lastSuccessfulFetchUtc;
+
+        await dbContext.SaveChangesAsync();
+    }
+
     private static WildfireRepository CreateRepository(
         Firesight.Infrastructure.Persistence.FiresightDbContext dbContext) =>
         new(
             dbContext,
-            Options.Create(new WildfireRetentionOptions { ExtinguishedDays = 7 }),
+            Options.Create(new WildfireRetentionOptions
+            {
+                ExtinguishedDays = 7,
+                MissingFromFeedDays = 5
+            }),
             Options.Create(new WildfireFreshnessOptions { StaleAfterHours = 48 }));
+
+    private static Wildfire CreateActiveFire(
+        string externalId,
+        DateTime lastSeenInFeedUtc) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = externalId,
+            Agency = "NT",
+            Location = new Point(-117.5, 62.5) { SRID = 4326 },
+            Status = "OC",
+            StatusDateUtc = lastSeenInFeedUtc,
+            LastSeenInFeedUtc = lastSeenInFeedUtc
+        };
 
     private static Wildfire CreateExtinguishedFire(
         string externalId,

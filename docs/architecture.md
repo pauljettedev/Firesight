@@ -50,8 +50,8 @@ without touching the logic.
 
 Rules that decide which fires to return, such as "hide fires extinguished more than 7 days
 ago", are written once in Domain as expressions (`Expression<Func<Wildfire, bool>>`, for
-example `WildfireRules.IsWithinRetention`). Repositories add them to queries with `.Where(...)`
-instead of repeating the condition. EF Core turns the expression into SQL, so the database
+example `WildfireRules.IsNotExtinguishedBefore`). Repositories add them to queries with
+`.Where(...)` instead of repeating the condition. EF Core turns the expression into SQL, so the database
 still does the filtering, and the rule can be unit tested against a plain list without a
 database.
 

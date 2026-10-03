@@ -37,7 +37,7 @@ public class Wildfire
         DateTime? statusDateUtc,
         DateTime observedAtUtc)
     {
-        // Exact match, the same as IsWithinRetention, which runs as SQL.
+        // Exact match, the same as IsNotExtinguishedBefore, which runs as SQL.
         // CWFIS status is stored exactly as sent, so the two must agree.
         if (status == WildfireRules.ExtinguishedStatus)
         {

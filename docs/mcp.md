@@ -40,14 +40,12 @@ All three tools only read data. They never change anything.
 | `get_wildfire_by_external_id` | `externalId`, the CWFIS `national_fire_id`, for example `2026_ON_THU_FIRE_036` | That fire, or `null` if Firesight doesn't have it |
 | `find_wildfires_near_location` | `latitude`, `longitude`, `radiusKm` | Fires within the radius, nearest first, each with its `distanceKm` |
 
-The tools return the same fires the map shows: current fires, including stale ones, and
-extinguished fires for 7 days after they went out. Each fire has the same fields as the REST
-API ([api.md](api.md)), including `isStale`.
+The tools return the same fires, with the same fields, as `GET /api/wildfires`
+([api.md](api.md#get-apiwildfires)).
 
 Each tool's description also explains the results to the model: what the status codes mean,
-that a null field means CWFIS didn't provide the value, and that a fire missing from recent
-feed updates isn't necessarily out. Without that, Claude guessed that such fires had been
-declared out ([data-sources.md](data-sources.md)).
+that a null field means CWFIS didn't provide the value, and that a stale fire may have gone out
+even though its status hasn't changed ([data-sources.md](data-sources.md)).
 
 `find_wildfires_near_location` checks its inputs the same way the REST API does: latitude from
 -90 to 90, longitude from -180 to 180, and a radius above 0 and up to 1,000 km. Bad input comes

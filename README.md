@@ -51,7 +51,8 @@ ID are rejected and counted rather than guessed at.
 
 **Honest about freshness.** Firesight tracks when the feed was last fetched separately from
 when each fire was last seen in it. A fire missing from recent syncs is flagged as stale,
-but its official status is never changed. Firesight only reports what CWFIS said.
+and hidden after 5 days, but its official status is never changed. Firesight only reports
+what CWFIS said.
 
 **Spatial search in the database.** "Fires within 200 km of Ottawa" is a PostGIS geography
 query (`ST_DWithin`), measured in real distances on the globe and sorted by distance.

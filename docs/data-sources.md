@@ -71,21 +71,32 @@ hasn't seen this fire lately". It never changes the fire's status.
 
 ### When a fire drops out of the feed
 
-Firesight doesn't guess why a fire is missing. It keeps the fire with its last known status,
-and after 48 hours marks it stale. It stays on the map, marked stale, until CWFIS reports it
-again or reports it as extinguished.
+Firesight keeps the fire with its last known status and doesn't change it. After 48 hours it
+marks the fire stale.
+
+After 5 days missing (`WildfireRetention:MissingFromFeedDays`), the fire is hidden from the
+map, the API and MCP. CWFIS often drops a fire from this layer when it goes out instead of
+reporting `EX`, so without this rule those fires would stay on the map forever
+([ADR 004](decisions/004-wildfire-freshness.md)).
+
+The 5 days are counted back from the last successful sync, not from now. If CWFIS is down,
+fires aren't hidden just because Firesight couldn't check the feed.
+
+A hidden fire isn't deleted. If CWFIS reports it again, it reappears.
 
 ### Extinguished fires
 
-When a fire's status becomes `EX`, Firesight records when it first saw that. The fire stays
-visible for 7 days (`WildfireRetention:ExtinguishedDays`) from that moment, then is hidden from
-the map, the API and MCP. It isn't deleted. If CWFIS later reports it as active again, it
+CWFIS can still report a fire as `EX`, so Firesight handles that too. When a fire's status
+becomes `EX`, Firesight records when it first saw that. The fire stays visible for 7 days
+(`WildfireRetention:ExtinguishedDays`) from that moment, then is hidden from the map, the API
+and MCP. It isn't deleted. If CWFIS later reports it as active again, it
 reappears and the 7-day clock starts over.
 
 ### When CWFIS is down
 
 A failed sync is logged and recorded in the sync state, and Firesight keeps serving the data
-it already has. The next attempt is an hour later.
+it already has, however long the outage lasts. Fires are marked stale, but none are hidden as
+missing. The next attempt is an hour later.
 
 ### What the database is for
 

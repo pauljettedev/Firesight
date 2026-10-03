@@ -5,4 +5,6 @@ public sealed class WildfireRetentionOptions
     public const string SectionName = "WildfireRetention";
 
     public int ExtinguishedDays { get; init; } = 7;
+
+    public int MissingFromFeedDays { get; init; } = 5;
 }

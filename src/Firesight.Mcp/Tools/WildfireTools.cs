@@ -11,17 +11,17 @@ namespace Firesight.Mcp.Tools;
 public sealed class WildfireTools(IWildfireService wildfireService)
 {
     // Added to every tool description, so the model reads it before using the
-    // results. In testing, Claude guessed that fires missing from recent feed
-    // updates had been declared out. This is the one place that explains the
-    // results to the model.
+    // results. In testing, Claude stated that stale fires had been declared
+    // out, which the data doesn't say. This is the one place that explains
+    // the results to the model.
     private const string ResultGuidance =
         "Each fire's status is its stage of control exactly as CWFIS reports it: " +
         "OC (out of control), BH (being held), UC (under control) or EX (extinguished). " +
         "A null field means CWFIS didn't provide that value. It isn't an error. " +
-        "A fire can drop out of the CWFIS feed for reasons Firesight can't see. " +
-        "isStale, or a lastSeenInFeedUtc earlier than other fires', means the record " +
-        "hasn't been refreshed. It does not mean the fire is out. " +
-        "Report the status as given.";
+        "isStale means the fire hasn't been in the CWFIS feed for a while. " +
+        "CWFIS often drops fires that have gone out, so a stale fire may be out, " +
+        "but its status is still the last one CWFIS reported. " +
+        "Say that, rather than stating the fire is out.";
 
     [McpServerTool(
         Name = "get_active_wildfires",
