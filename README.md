@@ -34,41 +34,25 @@ instead, see [MCP](docs/mcp.md).
 
 ## Under the hood
 
-**AI answers checked against real data.** Ask Firesight gives Claude tools that call
-Firesight's own services. Claude decides what to look up, but for "how many", "are there
-any", and "what's the status of" questions, the code works out the answer from the actual
-results instead of trusting the model to count. The fires Claude links to an answer are
-checked against the fires its tools really returned, and any it made up are dropped.
-Requests are rate limited and length capped to keep cost bounded.
+**AI answers checked in code.** Claude chooses what to look up, but counts and statuses come
+from the real data, not the model. Fire IDs Claude can't back up are dropped.
 
-**One set of business logic, three front doors.** The REST API, the MCP tools, and Ask
-Firesight all call the same application services, so spatial queries and rules are written
-once. Business rules live in the domain layer as expressions that EF Core turns into SQL, so
-they're unit tested without a database but still run as `WHERE` clauses in PostGIS.
+**Business logic written once.** The REST API, the MCP tools and Ask Firesight share the same
+application services. Spatial queries and domain rules run as SQL in PostGIS, and the rules
+are unit tested without a database.
 
-**Careful data sync.** CWFIS publishes a time-versioned feed. Each sync reads every page at
-the same snapshot instant, with a fixed sort order, so a record can't be skipped or counted
-twice. The sync is all-or-nothing: if any page fails, nothing is applied. Records without an
-ID are rejected and counted rather than guessed at.
+**Reliable sync.** Each CWFIS sync is all-or-nothing, so the map never shows a half-updated
+feed.
 
-**Honest about freshness.** Firesight tracks when the feed was last fetched separately from
-when each fire was last seen in it. A fire missing from recent syncs is flagged as stale,
-and hidden after 5 days, but its official status is never changed. Firesight only reports
-what CWFIS said.
+**Honest about freshness.** Fires missing from the feed are marked stale, then hidden after
+5 days. Firesight never changes the status CWFIS reported.
 
-**Spatial search in the database.** "Fires within 200 km of Ottawa" is a PostGIS geography
-query (`ST_DWithin`), measured in real distances on the globe and sorted by distance.
+**Tested against the real database.** Integration tests run against PostGIS in Docker, not an
+in-memory fake.
 
-**Tested against the real thing.** Integration tests start a disposable PostGIS container,
-apply the real migrations, and run the actual spatial queries, not an in-memory fake. The MCP
-tools are tested through a real MCP client connection. The UI has its own component tests.
+**Deployed automatically.** Every push to `main` is tested and deployed.
 
-**Shipped, not just built.** Every push to `main` runs the tests, then deploys to a
-DigitalOcean droplet over SSH. The deploy action is pinned to a commit and the server's
-identity is checked before connecting.
-
-Why each of these was built this way is written up in the
-[decision records](docs/decisions/README.md).
+The reasons behind these choices are in the [decision records](docs/decisions/README.md).
 
 ## Stack
 
