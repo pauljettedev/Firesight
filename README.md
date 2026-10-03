@@ -30,6 +30,8 @@ Firesight's MCP server is public, with no login, so you can connect Claude to it
 Claude calls Firesight's tools and answers from its live data. To use it from Claude Code
 instead, see [MCP](docs/mcp.md).
 
+![Claude in claude.ai answering "nearest canadian wildfire near kamloops" using the Firesight connector, listing nearby fires with their distance, size and status](docs/images/claude-connector-answer.webp)
+
 ## Under the hood
 
 **AI answers checked against real data.** Ask Firesight gives Claude tools that call
