@@ -42,6 +42,24 @@ public sealed class WildfireMcpTransportIntegrationTests
     }
 
     [Fact]
+    public async Task ToolDiscovery_EveryToolDescriptionExplainsStatusAndStaleness()
+    {
+        var service = new StubWildfireService();
+
+        await using var app = await CreateAppAsync(service);
+        await using var client = await CreateClientAsync(app);
+
+        var tools = await client.ListToolsAsync();
+
+        // Without this guidance, models guess that fires missing from the feed are out.
+        foreach (var tool in tools)
+        {
+            Assert.Contains("It does not mean the fire is out.", tool.Description);
+            Assert.Contains("UC (under control)", tool.Description);
+        }
+    }
+
+    [Fact]
     public async Task ToolDiscovery_UsesPortableNullableSchemasForWildfireResults()
     {
         var service = new StubWildfireService();

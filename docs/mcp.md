@@ -44,6 +44,11 @@ The tools return the same fires the map shows: current fires, including stale on
 extinguished fires for 7 days after they went out. Each fire has the same fields as the REST
 API ([api.md](api.md)), including `isStale`.
 
+Each tool's description also explains the results to the model: what the status codes mean,
+that a null field means CWFIS didn't provide the value, and that a fire missing from recent
+feed updates isn't necessarily out. Without that, Claude guessed that such fires had been
+declared out ([data-sources.md](data-sources.md)).
+
 `find_wildfires_near_location` checks its inputs the same way the REST API does: latitude from
 -90 to 90, longitude from -180 to 180, and a radius above 0 and up to 1,000 km. Bad input comes
 back as a tool error listing every problem, for example
@@ -73,7 +78,3 @@ only changes the published description; the data itself is the same.
 Every field is listed as required, so a null field is always sent as `null` rather than left
 out. The MCP library leaves nulls out by default, and strict clients such as Claude Code reject
 a result with a required field missing.
-
-The schema also describes each field for the model. It says a null means the value isn't
-available, not that something failed, and that `isStale` says nothing about a fire's status
-([data-sources.md](data-sources.md)).
